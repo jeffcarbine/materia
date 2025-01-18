@@ -39,7 +39,7 @@ export default {
    * @param {string} binding - The binding to get the value for.
    * @returns {*} The bindingValue of the specified binding.
    */
-  getValueFromBinding: function (binding) {
+  get: function (binding) {
     const value = binding.split(".").reduce((acc, part) => {
       const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
       if (arrayMatch) {
@@ -53,7 +53,7 @@ export default {
   },
 
   // Function to compare and update data
-  compareAndUpdate(target, value, path = "", changes = []) {
+  _compareAndUpdate(target, value, path = "", changes = []) {
     // Create a copy of the target
     const updatedTarget = Array.isArray(target) ? [...target] : { ...target };
 
@@ -81,7 +81,7 @@ export default {
             updatedTarget[key] = {};
           }
 
-          const result = this.compareAndUpdate(
+          const result = this._compareAndUpdate(
             updatedTarget[key],
             value[key],
             newPath,
@@ -101,7 +101,7 @@ export default {
   },
 
   // Function to create a proxy for arrays
-  createArrayProxy(array, path, changes) {
+  _createArrayProxy(array, path, changes) {
     return new Proxy(array, {
       set(target, prop, value) {
         const result = Reflect.set(target, prop, value);
@@ -117,7 +117,7 @@ export default {
   },
 
   // splits a binidng into hook and tether
-  splitBinding(binding) {
+  _splitBinding(binding) {
     const parts = binding.split(".");
     const hook = parts.shift();
     const tether = parts.join(".");
@@ -141,7 +141,7 @@ export default {
    *
    * @returns {Proxy} The Proxy object for the data.
    */
-  createDataProxy() {
+  _createDataProxy() {
     const self = this; // Capture the `this` context
 
     return new Proxy(
@@ -157,7 +157,7 @@ export default {
         get(target, binding, receiver) {
           if (binding === "update") {
             return (value) => {
-              const changes = self.compareAndUpdate(target, value);
+              const changes = self._compareAndUpdate(target, value);
               return changes;
             };
           }
@@ -175,7 +175,7 @@ export default {
           }
 
           if (Array.isArray(current)) {
-            return self.createArrayProxy(current, binding, []);
+            return self._createArrayProxy(current, binding, []);
           }
 
           return current; // Return the final value
@@ -192,7 +192,7 @@ export default {
          */
         async set(target, hook, value, receiver) {
           // Perform the comparison and update
-          const { updatedTarget, changes } = self.compareAndUpdate(
+          const { updatedTarget, changes } = self._compareAndUpdate(
             target[hook],
             value
           );
@@ -207,17 +207,12 @@ export default {
   },
 
   set(binding, value) {
-    // get an array of the keys that lead to the target
     const keys = binding.split(/[\.\[\]]/).filter(Boolean),
       hook = keys[0];
 
-    // first, check to see if we have a hook set yet or not
-    // the hook will be the first value of the keys
-    // if we don't have one, we can set it to the value and we are done
     if (!this.data[hook]) {
       this.data[hook] = value;
     } else {
-      // we need to loop through the keys to get to the target
       const check = (target, index) => {
         if (index === keys.length - 1) {
           target[keys[index]] = value;
@@ -229,23 +224,55 @@ export default {
       check(this.data, 0);
     }
 
+    this._handleBindingUpdate(binding);
+  },
+
+  push(binding, value) {
+    const keys = binding.split(/[\.\[\]]/).filter(Boolean),
+      hook = keys[0];
+
+    if (!this.data[hook]) {
+      console.error(`Error: ${hook} is not defined.`);
+      return;
+    }
+
+    let isPushed = false;
+
+    const check = (target, index) => {
+      if (index === keys.length - 1) {
+        if (Array.isArray(target[keys[index]])) {
+          target[keys[index]].push(value);
+          isPushed = true;
+        } else {
+          console.error(`Error: ${binding} is not an array.`);
+        }
+      } else {
+        check(target[keys[index]], index + 1);
+      }
+    };
+
+    check(this.data, 0);
+
+    if (isPushed) {
+      this._handleBindingUpdate(binding);
+    }
+  },
+
+  _handleBindingUpdate(binding) {
     const checkHandlers = (binding) => {
       if (this.handlers[binding]) {
         this.handlers[binding].forEach((handler) => {
-          this.handle(binding, handler);
+          this._handle(binding, handler);
 
           if (!this._fromServer) {
-            const { hook } = this.splitBinding(binding);
+            const { hook } = this._splitBinding(binding);
             const endpoint = this.endpoints[hook];
             if (endpoint) {
-              this.syncWithServer(binding);
+              this._syncWithServer(binding);
             }
           }
         });
       } else {
-        // if the binding doesn't exist, then check to see if there is
-        // a parent binding that has a handler
-        // do this by removing the last key from the binding, by either . or []
         const parentBinding = binding.replace(/(\.[^\.]*|\[\d+\])$/, "");
         if (parentBinding !== binding) {
           checkHandlers(parentBinding);
@@ -269,9 +296,9 @@ export default {
    * @param {boolean} [options.sendData=true] - Whether to send data to the server.
    * @param {boolean} [options.receiveData=true] - Whether to receive data from the server.
    */
-  syncWithServer(binding, options = {}) {
+  _syncWithServer(binding, options = {}) {
     const { method = "POST", sendData = true, receiveData = true } = options;
-    const { hook } = this.splitBinding(binding);
+    const { hook } = this._splitBinding(binding);
     const endpoint = this.endpoints[hook];
 
     if (!this.data[hook]) {
@@ -285,9 +312,7 @@ export default {
 
     // Set a new timeout for this binding
     this.syncTimeouts[binding] = setTimeout(() => {
-      const dataToSend = sendData
-        ? JSON.stringify(this.getValueFromBinding(binding))
-        : null;
+      const dataToSend = sendData ? JSON.stringify(this.get(binding)) : null;
 
       fetch(endpoint, {
         method,
@@ -306,10 +331,7 @@ export default {
         })
         .then((data) => {
           if (receiveData) {
-            if (
-              JSON.stringify(data) !==
-              JSON.stringify(this.getValueFromBinding(binding))
-            ) {
+            if (JSON.stringify(data) !== JSON.stringify(this.get(binding))) {
               this._fromServer = true;
               this.set(binding, data);
               this._fromServer = false;
@@ -335,7 +357,7 @@ export default {
    * @returns {void}
    */
   init() {
-    this.data = this.createDataProxy();
+    this.data = this._createDataProxy();
   },
 
   /**
@@ -358,23 +380,10 @@ export default {
   },
 
   /**
-   * Gets data from a binding via a tether, andchor or binding
-   */
-  getData(binding, addition) {
-    // the binding might be "user.name" and the addition might be "first_name"
-    // so we just need to combine them into a full binding
-    if (addition) {
-      binding = `${binding}.${addition}`;
-    }
-
-    return this.getValueFromBinding(binding);
-  },
-
-  /**
    * Generates a unique ID.
    * @returns {string} The unique ID.
    */
-  generateUniqueId() {
+  _generateUniqueId() {
     return "_" + Math.random().toString(36).substr(2, 9);
   },
 
@@ -383,7 +392,7 @@ export default {
    * @param {string} str - The camelCase string to convert.
    * @returns {string} The hyphenated string.
    */
-  camelToHyphen(str) {
+  _camelToHyphen(str) {
     return str.replace(/[A-Z]/g, (match) => "-" + match.toLowerCase());
   },
 
@@ -396,7 +405,7 @@ export default {
    * @param {number} depth - The depth of the rendering.
    * @returns {void}
    */
-  setElementAttribute(element, key, value, depth = 0) {
+  _setElementAttribute(element, key, value, depth = 0) {
     const nonAttributes = [
       "children",
       "prepend",
@@ -410,19 +419,19 @@ export default {
     ];
 
     if (!nonAttributes.includes(key)) {
-      this.setAttribute(element, key, value);
+      this._setAttribute(element, key, value);
     } else if (key === "style") {
-      this.setStyle(element, value);
+      this._setStyle(element, value);
     } else if (key === "innerHTML") {
-      this.setInnerHTML(element, value);
+      this._setInnerHTML(element, value);
     } else if (key === "prepend") {
-      this.prependChild(element, value, depth);
+      this._prependChild(element, value, depth);
     } else if (key === "children" || key === "child") {
-      this.setChildren(element, key, value, depth);
+      this._setChildren(element, key, value, depth);
     } else if (key === "textContent") {
-      this.setTextContent(element, value);
+      this._setTextContent(element, value);
     } else if (key === "append") {
-      this.appendChild(element, value, depth);
+      this._appendChild(element, value, depth);
     }
   },
 
@@ -433,13 +442,13 @@ export default {
    * @param {string} value - The value of the attribute.
    * @returns {void}
    */
-  setAttribute(element, key, value) {
+  _setAttribute(element, key, value) {
     element.removeAttribute(key);
     const hasUpperCase = /[A-Z]/.test(key);
     if (hasUpperCase) {
-      element.setAttributeNS(null, key, value);
+      element._setAttributeNS(null, key, value);
     } else {
-      element.setAttribute(key, value);
+      element._setAttribute(key, value);
     }
   },
 
@@ -449,17 +458,17 @@ export default {
    * @param {string|Object} value - The style to set.
    * @returns {void}
    */
-  setStyle(element, value) {
+  _setStyle(element, value) {
     let style = "";
     if (typeof value === "string") {
       style = value;
     } else if (typeof value === "object") {
       for (let key in value) {
-        const property = key.includes("-") ? key : this.camelToHyphen(key);
+        const property = key.includes("-") ? key : this._camelToHyphen(key);
         style += `${property}:${value[key]};`;
       }
     }
-    element.setAttribute("style", style);
+    element._setAttribute("style", style);
   },
 
   /**
@@ -468,7 +477,7 @@ export default {
    * @param {string} value - The inner HTML to set.
    * @returns {void}
    */
-  setInnerHTML(element, value) {
+  _setInnerHTML(element, value) {
     element.innerHTML = "";
     element.innerHTML = value;
   },
@@ -480,7 +489,7 @@ export default {
    * @param {number} depth - The depth of the rendering.
    * @returns {void}
    */
-  prependChild(element, value, depth) {
+  _prependChild(element, value, depth) {
     if (typeof value !== "object") {
       element.prepend(document.createTextNode(value));
     } else {
@@ -498,7 +507,7 @@ export default {
    * @param {Array} value - The value of the children.
    * @param {number} depth - The depth of the rendering.
    */
-  setChildren(element, key, value, depth, parentBinding) {
+  _setChildren(element, key, value, depth, parentBinding) {
     let children = key === "children" ? value : [value];
 
     // check to see if the children value is valid
@@ -518,7 +527,7 @@ export default {
     }
 
     if (element.children.length > 0 || value === null) {
-      this.clearChildren(element);
+      this._clearChildren(element);
       if (value === null) return;
     }
 
@@ -536,7 +545,7 @@ export default {
    * @param {string} value - The value of the text content.
    * @returns {void}
    */
-  setTextContent(element, value) {
+  _setTextContent(element, value) {
     element.textContent = "";
     element.appendChild(document.createTextNode(value));
   },
@@ -548,7 +557,7 @@ export default {
    * @param {number} depth - The depth of the rendering.
    * @returns {void}
    */
-  appendChild(element, value, depth) {
+  _appendChild(element, value, depth) {
     if (typeof value !== "object") {
       element.appendChild(document.createTextNode(value));
     } else {
@@ -561,7 +570,7 @@ export default {
 
   importedComponents: {},
 
-  async handle(binding, handler) {
+  async _handle(binding, handler) {
     let { element, func, property, pipe } = handler;
 
     let value;
@@ -604,14 +613,14 @@ export default {
       }
     }
 
-    value = func(this.getValueFromBinding(binding), e, pipe);
+    value = func(this.get(binding), e, pipe);
 
-    this.setElementAttribute(element, property, value);
+    this._setElementAttribute(element, property, value);
   },
 
   delegate: {},
 
-  eventTypes: [
+  _eventTypes: [
     "click",
     "dblclick",
     "mousedown",
@@ -654,7 +663,7 @@ export default {
    * @param {string} event - The event to add the delegate for
    * @param {Function} func - The function to run when the event is triggered
    */
-  addEventDelegate(element, event, func) {
+  _addEventDelegate(element, event, func) {
     // if this is the server, store the event delegate data on the element itself
     if (isServer) {
       if (!element.dataset.eventDelegates) {
@@ -678,12 +687,12 @@ export default {
       } else if (event.indexOf("scroll") > -1 && element === window) {
         scrollFunctions.push(func);
       } else {
-        this.registerEvent(event, element, func, true);
+        this._registerEvent(event, element, func, true);
       }
     }
   },
 
-  registerEvent(event, target, func, preventDefault) {
+  _registerEvent(event, target, func, preventDefault) {
     // check to see if the object already has an instance of the event (which, if it does, it means we have already
     // registered an Event Listener for it)
     if (this.delegate[event] === undefined) {
@@ -704,7 +713,7 @@ export default {
     this.delegate[event].push(eventData);
   },
 
-  isDescendant(parent, child) {
+  _isDescendant(parent, child) {
     let node = child;
     while (node !== null) {
       if (node === parent) {
@@ -715,11 +724,11 @@ export default {
     return false;
   },
 
-  eventMatches(event, element) {
-    return this.isDescendant(element, event.target);
+  _eventMatches(event, element) {
+    return this._isDescendant(element, event.target);
   },
 
-  eventHandler(event) {
+  _eventHandler(event) {
     // empty eventObj so we can properly pass what
     // delegate event we are going to match this event to
     var eventArr;
@@ -742,12 +751,12 @@ export default {
 
       // check whether the element or it's direct parent match
       // the key
-      let match = this.eventMatches(event, target);
+      let match = this._eventMatches(event, target);
 
       // set the disabled bool
       let disabled = false;
 
-      // if the eventMatches returned a node
+      // if the _eventMatches returned a node
       if (match !== false) {
         // stop events if the element is disabled
         if (match.disabled === true) {
@@ -772,7 +781,7 @@ export default {
     });
   },
 
-  mutationConfig: {
+  _mutationConfig: {
     attributes: true,
     attributeFilter: [
       "class",
@@ -792,7 +801,7 @@ export default {
   },
 
   // check to see if an event is a mutation or not
-  isValidMutation(event) {
+  _isValidMutation(event) {
     if (event === "childList" || event.includes("attributes")) {
       return true;
     } else {
@@ -801,17 +810,17 @@ export default {
   },
 
   // Callback function to execute when mutations are observed
-  mutationCallback(mutationsList) {
+  _mutationCallback(mutationsList) {
     function runCallback() {
       for (var i = 0; i < mutationsList.length; i++) {
         let mutation = mutationsList[i];
 
         if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-          executeCheck(mutation);
+          _executeCheck(mutation);
         } else if (mutation.type === "attributes") {
-          executeCheck(mutation);
+          _executeCheck(mutation);
         } else if (mutation.type === "characterData") {
-          executeCheck(mutation);
+          _executeCheck(mutation);
         }
       }
     }
@@ -819,19 +828,19 @@ export default {
     runCallback();
   },
 
-  observingMutations: false,
+  _observingMutations: false,
 
-  observer: null,
+  _observer: null,
 
-  observeMutations() {
+  _observeMutations() {
     // Select the node that will be observed for mutations
     const targetNode = document.querySelector("body");
 
     // Start observing the target node for configured mutations
-    observer.observe(targetNode, this.mutationConfig);
+    _observer.observe(targetNode, this._mutationConfig);
   },
 
-  executeCheck(mutation) {
+  _executeCheck(mutation) {
     let mutationTarget = mutation.target;
 
     let type = mutation.type;
@@ -875,19 +884,19 @@ export default {
     }
   },
 
-  enableEventDelegation() {
+  _enableEventDelegation() {
     for (var event in this.delegate) {
       // if it is a mutation, then we don't need to register an event with the document
       // because mutations are handled below by our mutationObserver
-      if (!this.isValidMutation(event)) {
+      if (!this._isValidMutation(event)) {
         // then add a new event listener for that event
-        document.addEventListener(event, this.eventHandler.bind(this), false);
-      } else if (!this.observingMutations) {
+        document.addEventListener(event, this._eventHandler.bind(this), false);
+      } else if (!this._observingMutations) {
         // then we need to start observing mutations
-        this.observeMutations();
+        this._observeMutations();
 
-        // set the observingMutations bool to true
-        this.observingMutations = true;
+        // set the _observingMutations bool to true
+        this._observingMutations = true;
       }
     }
   },
@@ -918,7 +927,7 @@ export default {
     // Create the element
     const tagName = template.tagName || "div";
     const element = document.createElementNS(
-      this.getNamespace(tagName),
+      this._getNamespace(tagName),
       tagName
     );
 
@@ -929,11 +938,11 @@ export default {
     Object.keys(template).forEach((key) => {
       let value = template[key];
 
-      if (this.eventTypes.includes(key)) {
-        this.addEventDelegate(element, key, value);
+      if (this._eventTypes.includes(key)) {
+        this._addEventDelegate(element, key, value);
       } else {
-        if (this.isStringifiedFunction(value)) {
-          value = this.parseStringifiedFunction(value);
+        if (this._isStringifiedFunction(value)) {
+          value = this._parseStringifiedFunction(value);
         }
 
         // bandle binding stuff
@@ -960,7 +969,7 @@ export default {
               `No binding found for function value: ${value.toString()}`
             );
           } else {
-            this.processFunctionValue(
+            this._processFunctionValue(
               element,
               key,
               value,
@@ -970,14 +979,14 @@ export default {
             );
           }
         } else if (value !== null) {
-          this.setElementAttribute(element, key, value, depth);
+          this._setElementAttribute(element, key, value, depth);
         }
       }
     });
 
     // Handle server-side rendering
     if (isServer && depth === 0) {
-      return this.handleServerSideRendering(element);
+      return this._handleServerSideRendering(element);
     } else {
       if (callbackOrQuery) {
         if (typeof callbackOrQuery === "function") {
@@ -996,7 +1005,7 @@ export default {
    * @param {string} tagName - The tag name to get the namespace for.
    * @returns {string} The namespace for the specified tag name.
    */
-  getNamespace(tagName) {
+  _getNamespace(tagName) {
     const namespaces = {
       svg: "http://www.w3.org/2000/svg",
       math: "http://www.w3.org/1998/Math/MathML",
@@ -1013,7 +1022,7 @@ export default {
    * @param {string} str - The string to check.
    * @returns {boolean} True if the string is a stringified function, false otherwise.
    */
-  isStringifiedFunction(str) {
+  _isStringifiedFunction(str) {
     if (typeof str !== "string") {
       return false;
     }
@@ -1026,8 +1035,8 @@ export default {
    * @param {string} str - The stringified function to parse.
    * @returns {Function} The parsed function.
    */
-  parseStringifiedFunction(str) {
-    if (this.isStringifiedFunction(str)) {
+  _parseStringifiedFunction(str) {
+    if (this._isStringifiedFunction(str)) {
       return new Function(`return (${str})`)();
     }
     throw new Error("Invalid stringified function");
@@ -1041,7 +1050,7 @@ export default {
    * @param {number} depth - The depth of the rendering.
    * @returns {void}
    */
-  processFunctionValue(element, property, func, pipe, binding, depth) {
+  _processFunctionValue(element, property, func, pipe, binding, depth) {
     let handlerElement,
       preservedFunc = func;
 
@@ -1068,10 +1077,10 @@ export default {
       // create a handlerId to serve in place of the element in the handlers object
       // in the event the element doesn't already have one
       if (!element.dataset.handlerId) {
-        handlerElement = this.generateUniqueId();
+        handlerElement = this._generateUniqueId();
 
         // give the handlerId to the element
-        element.setAttribute("data-handler-id", handlerElement);
+        element._setAttribute("data-handler-id", handlerElement);
       } else {
         handlerElement = element.dataset.handlerId;
       }
@@ -1105,29 +1114,11 @@ export default {
       pipe,
     });
 
-    const result = preservedFunc(
-      this.getValueFromBinding(binding),
-      e,
-      clientPipe
-    );
+    const result = preservedFunc(this.get(binding), e, clientPipe);
 
     if (result !== null) {
-      this.setElementAttribute(element, property, result, depth);
+      this._setElementAttribute(element, property, result, depth);
     }
-  },
-
-  customReplacer(key, value) {
-    if (typeof value === "function") {
-      return value.toString();
-    }
-    return value;
-  },
-
-  customReviver(key, value) {
-    if (typeof value === "string" && value.startsWith("class ")) {
-      return eval(`(${value})`);
-    }
-    return value;
   },
 
   /**
@@ -1135,7 +1126,7 @@ export default {
    * @param {Element} element - The element to render.
    * @returns {string} The rendered HTML
    */
-  handleServerSideRendering(element) {
+  _handleServerSideRendering(element) {
     if (element.tagName === "HTML") {
       const script = document.createElement("script");
       script.textContent = `
@@ -1146,7 +1137,7 @@ export default {
         Objekt.init();
         window.Objekt = Objekt;
 
-        Objekt.mutationObserver = new MutationObserver(Objekt.mutationCallback);
+        Objekt.mutationObserver = new MutationObserver(Objekt._mutationCallback);
 
         const parsedData = JSON.parse("${JSON.stringify(this.data)
           .replace(/\\/g, "\\\\")
@@ -1172,7 +1163,7 @@ export default {
 
           Object.keys(Objekt.endpoints).forEach(hook => {
             if (!parsedData[hook]) {
-              Objekt.syncWithServer(hook, {sendData: false});
+              Objekt._syncWithServer(hook, {sendData: false});
             }
           });
 
@@ -1233,19 +1224,19 @@ export default {
             eventDelegates.forEach(({ event, func }) => {
               // turn the func from a string back into an anonymous function
               const restoredFunc = new Function('Objekt', \`return \${func}\`)(Objekt);
-              Objekt.addEventDelegate(element, event, restoredFunc);
+              Objekt._addEventDelegate(element, event, restoredFunc);
             });
           });
 
-          Objekt.enableEventDelegation();
+          Objekt._enableEventDelegation();
         }
         
         // Call the main initialization function
         initializeObjekt();
       `;
 
-      script.setAttribute("type", "module");
-      script.setAttribute("defer", true);
+      script._setAttribute("type", "module");
+      script._setAttribute("defer", true);
 
       const body = element.querySelector("body");
       const scripts = body.querySelectorAll("script");
@@ -1264,7 +1255,7 @@ export default {
    * @param {Element} element - The element to clear the children of.
    * @returns {void}
    */
-  clearChildren(element) {
+  _clearChildren(element) {
     // we need to check this.handlers for any reference to any of the children that are being removed
     // and remove their handlers
     // get all the children
