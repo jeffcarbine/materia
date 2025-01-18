@@ -1,4 +1,4 @@
-# objekt
+# Objekt
 
 A lightweight JavaScript framework for rendering both server-side and client-side HTML.
 
