@@ -1273,4 +1273,34 @@ export default {
       element.removeChild(child);
     });
   },
+
+  destroy(binding) {
+    const keys = binding.split(/[\.\[\]]/).filter(Boolean),
+      hook = keys[0];
+
+    // Delete the data at the binding
+    const deleteData = (target, index) => {
+      if (index === keys.length - 1) {
+        delete target[keys[index]];
+      } else {
+        deleteData(target[keys[index]], index + 1);
+      }
+    };
+
+    if (this.data[hook]) {
+      deleteData(this.data, 0);
+    }
+
+    // Remove any elements bound to that binding
+    if (this.handlers[binding]) {
+      this.handlers[binding].forEach((bind) => {
+        if (bind.element && bind.element.parentNode) {
+          bind.element.parentNode.removeChild(bind.element);
+        }
+      });
+    }
+
+    // Remove any handlers attached to that binding
+    delete this.handlers[binding];
+  },
 };
