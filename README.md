@@ -7,12 +7,12 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
 You can install the package via npm:
 
 ```sh
-npm install @carbineco/objekt
+npm i objekt
 ```
 
 ## Import
 
-To use objekt directly, import it into your project.
+To use Objekt directly, import it into your project.
 
 ```js
 import objekt from "objekt";
@@ -30,7 +30,7 @@ engine(express);
 
 ## Elements
 
-objekt includes a library of all 161 valid HTML elements, including SVG elements. You can import any of these elements from the included `elements` file.
+Objekt includes a library of all 161 valid HTML elements, including SVG elements. You can import any of these elements from the included `elements` file.
 
 ```js
 import { Div, H1, Img, P } from "objekt/elements";
@@ -47,7 +47,7 @@ const element = new Div({
 
 ### Properties
 
-Properties of an element in objekt are the same as an Element in JavaScript, with a few exceptions listed below.
+Properties of an element in Objekt are the same as an Element in JavaScript, with a few exceptions listed below.
 
 ```js
 const element = document.querySelector("#element");
@@ -98,7 +98,7 @@ const element = new Div({
 
 ### Specialized Elements
 
-objekt also includes a number of specialized elements to simplify the process:
+Objekt also includes a number of specialized elements to simplify the process:
 
 - `Stylesheet` extends `Link` - adds `rel="stylesheet"` automatically
 - `PreLoadStyle` extends `Link` - adds `rel`, `as`, and `onload` to pre-load stylesheets
@@ -139,20 +139,30 @@ Some elments have unique shorthands:
 
 ## Client-side Render
 
-To client-side render, import the objekt object, create a new instance of it, and call the `create` method. `create` takes in three parameters:
+To client-side render, import `objekt` and call the `render()` method. `render()` takes in three parameters:
 
 - the object to render
 - the data to data-bind (optional)
-- callback to render the element to the DOM
+- either a target to append the rendered element to, or a callback function
 
 ```js
 import objekt from "objekt";
 
-const App = new objekt();
-
-App.create(new H1("Hello World"), (element) =>
+// renders an element and runs a callback
+objekt.create(new H1("Hello World"), (element) =>
   document.body.appendChild(element)
 );
+
+// renders an element with attached data and runs a callback
+objekt.create(new H1("Hello World"), {foo: "bar"}, (element) =>
+  document.body.appendChild(element)
+);
+
+// renders an element with attached data and appends it to "body"
+objekt.create(new H1("Hello World"), {foo: "bar"}, "body";
+
+// renders an element and appends it to "body"
+objekt.create(new H1("Hello World"), "body";
 ```
 
 ## Server-side Render
@@ -169,7 +179,7 @@ const app = express();
 engine(express);
 ```
 
-And then you can write your views using objekt with the extension of `.html.js`. Objekt templates export a default function with a parameter of `data`, which contains the data being sent from the server.
+And then you can write your views using Objekt with the extension of `.html.js`. Objekt templates export a default function with a parameter of `data`, which contains the data being sent from the server.
 
 ```js
 /// index.html.js
@@ -236,7 +246,7 @@ app.get("/", (req, res) => {
 
 ## Data Binding
 
-Data-bind functions are anonymous functions that run anytime a bound piece of data is updated on the `objekt`.
+Data-bind functions are anonymous functions that run anytime a bound piece of data is updated on `objekt`.
 
 To data-bind, pass an anonymous function to an element's property. The anonymous function accepts three parameters:
 
