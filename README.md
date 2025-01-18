@@ -1,4 +1,4 @@
-# html.js
+# objekt
 
 A lightweight JavaScript framework for rendering both server-side and client-side HTML.
 
@@ -12,19 +12,25 @@ npm install @carbineco/objekt
 
 ## Import
 
-Import html.js into your project
+To use objekt directly, import it into your project.
 
 ```js
-import Htmljs from "objekt";
-
-const App = new Htmljs();
+import objekt from "objekt";
 ```
 
-## Usage
+If you wish to use server-side rendering, import the engine into your project
 
-### Elements
+```js
+import engine from "objekt/engine";
+import express from "express";
 
-html.js includes a library of all 161 valid HTML elements, including SVG elements. You can import any of these elements from the included `elements` file.
+const app = express();
+engine(express);
+```
+
+## Elements
+
+objekt includes a library of all 161 valid HTML elements, including SVG elements. You can import any of these elements from the included `elements` file.
 
 ```js
 import { Div, H1, Img, P } from "objekt/elements";
@@ -41,16 +47,16 @@ const element = new Div({
 
 ### Properties
 
-Properties of an element in html.js are the same as an Element in JavaScript, with a few exceptions listed below.
+Properties of an element in objekt are the same as an Element in JavaScript, with a few exceptions listed below.
 
 ```js
-const standard = document.querySelector("#element");
+const element = document.querySelector("#element");
 element.id = "foo";
 element.tagName = "div";
 element.textContent = "Hello World";
 element.tabindex = -1;
 
-const htmls = new Div({
+const alsoElement = new Div({
   id: "foo",
   textContent: "Hello World",
   tabindex: -1,
@@ -59,7 +65,7 @@ const htmls = new Div({
 // both create <div id="foo" tabindex="-1">Hello World</div>
 ```
 
-#### Property Exceptions
+### Property Exceptions
 
 There are a few exceptions to this rule:
 
@@ -67,6 +73,7 @@ There are a few exceptions to this rule:
 - `child` accepts a single object to render as the element's sole child
 - `class` in lieu of className, for simplicity - however `className` does still work
 - `if` conditionally renders an element
+- `binding` the data value to bind the attribute to
 
 ```js
 const showElement = false;
@@ -89,18 +96,17 @@ const element = new Div({
 });
 ```
 
-#### Specialized Elements
+### Specialized Elements
 
-html.js also includes a number of specialized elements to simplify the process:
+objekt also includes a number of specialized elements to simplify the process:
 
-- `Layout` extends `Html` - automatically adds an instance of html.js as App();
 - `Stylesheet` extends `Link` - adds `rel="stylesheet"` automatically
 - `PreLoadStyle` extends `Link` - adds `rel`, `as`, and `onload` to pre-load stylesheets
 - `Module` extends `Script` - adds `type="module`
 - `HiddenInput`, `TextInput`, `SearchInput`, `TelInput`, `UrlInput`, `EmailInput`, `PasswordInput`, `DateInput`, `MonthInput`, `WeekInput`, `TimeInput`, `DateTimeLocalInput`, `NumberInput`, `RangeInput`, `ColorInput`, `CheckboxInput`, `RadioInput`, `ResetInput` all extend `Input` and add their appropriate `type`
 - `LazyImg` extends `Img` and adds `loading="lazy"`
 
-#### Property Shorthands
+### Property Shorthands
 
 You can shorthand properties in an element by passing a single value into it, in the even that element only needs a certain single value
 
@@ -131,39 +137,44 @@ Some elments have unique shorthands:
 - Thead: array shorthand wraps each child in a Th() unless already wrapped, and wraps the children in a Tr(), unless already wrapped
 - Tbody: array shorthand wraps first child in a Th() and subsequent children in a Td() unless already wrapped, and wraps the children in a Tr(), unless already wrapped
 
-### Rendering
+## Client-side Render
 
-#### Client-side Render
-
-To client-side render, import the Htmljs object, create a new instance of it, and call the `create` method. `create` takes in three parameters:
+To client-side render, import the objekt object, create a new instance of it, and call the `create` method. `create` takes in three parameters:
 
 - the object to render
 - the data to data-bind (optional)
 - callback to render the element to the DOM
 
 ```js
-import Htmljs from "objekt";
+import objekt from "objekt";
 
-const App = new Htmljs();
+const App = new objekt();
 
 App.create(new H1("Hello World"), (element) =>
   document.body.appendChild(element)
 );
 ```
 
-#### Server-side Render
+## Server-side Render
 
-To server-side render, use html.js as your view engine
+Objekt can server-side rener your layouts. The filename extension that Objekt looks for is `.html.js`.
+
+To server-side render, import the engine
 
 ```js
-app.set("view engine", "html.js");
+import engine from "objekt/engine";
+import express from "express";
+
+const app = express();
+engine(express);
 ```
 
-And then you can write your views using html.js with the extension of html.js. html.js templates export a default function with a parameter of `data`, which contains the data being sent from the server.
+And then you can write your views using objekt with the extension of `.html.js`. Objekt templates export a default function with a parameter of `data`, which contains the data being sent from the server.
 
 ```js
+/// index.html.js
 export default (data) => {
-  return new Layout([
+  return new Html([
     new Head([new Title(data.title), new Stylesheet("styles/site.css")]),
     new Body([
       new Main([
@@ -178,11 +189,20 @@ export default (data) => {
     ]),
   ]);
 };
+
+app.get("/", (req, res) => {
+  res.render("index", {
+    title: "Welcome to my website",
+    pageName: "Home",
+    pageWelcomeText: "Welcome to my website",
+  });
+});
 ```
 
 You can easily create a layout template to be shared across your views:
 
 ```js
+// layout.html.js
 export const layout = (data, content) => {
   return new Html([
     new Head([new Title(data.title), new Stylesheet("styles/site.css")]),
@@ -192,6 +212,7 @@ export const layout = (data, content) => {
 ```
 
 ```js
+// index.html.js
 import { layout } from "./layout.html.js";
 
 export default (data) => {
@@ -203,33 +224,74 @@ export default (data) => {
     ],
   });
 };
+
+app.get("/", (req, res) => {
+  res.render("index", {
+    title: "Welcome to my website",
+    pageName: "Home",
+    pageWelcomeText: "Welcome to my website",
+  });
+});
 ```
 
-### Data Binding
+## Data Binding
 
-To data-bind, pass an anonymous function to an element's property. The anonymous function accepts two parameters:
+Data-bind functions are anonymous functions that run anytime a bound piece of data is updated on the `objekt`.
+
+To data-bind, pass an anonymous function to an element's property. The anonymous function accepts three parameters:
 
 - The data being bound
-- The library of html.js elements
+- The `objekt/elements` library of elements
+- The piped data to the function
+
+To start, you need to add data to `objekt.data` using the `.set()` method. The first parameter of the `set()` function is known as the `binding`.
 
 ```js
-const data = {
-  _id: "testData",
-  elementClass: "test-element",
-  elementText: "This is a test of data-binding",
+objekt.data.set("test", {
+  class: "test-element",
+  text: "This is a test of data-binding",
   children: ["one", "two", "three"],
-};
+});
+```
+
+Then, instead of writing static values in your data, you can define the binding, and then access that data via the anonymous function.
+
+```js
+const element = new Div({
+  binding: "test",
+  class: (test) => test.class,
+  children: [new P((test) => test.text)],
+});
+```
+
+### The Pipe
+
+Since the binding functions are anonymous, they don't inheritly have access to the values defined outside of it. In order to access external data, you need to first pipe it to your element.
+
+#### Client-side
+
+If you are client-side, you can simply pass the values directly
+
+```js
+import { Component } from "./someComponent.html.js";
 
 const element = new Div({
-  class: (data) => data.elementClass,
+  binding: "test",
+  pipe: {
+    Component,
+  }
+  class: (test) => test.class,
   children: [
-    new P((data) => data.elementText),
+    new P((test) => test.text),
     new Ul({
-      children: (data, e) => {
+      children: (test, elements, pipe) => {
+        const { Component } = pipe;
+        const { Li } = elements;
+
         const children = [];
 
-        data.children.forEach((child) => {
-          children.push(new e.Li(child));
+        element.children.forEach((child) => {
+          children.push(new Li(child));
         });
 
         return children;
@@ -239,43 +301,109 @@ const element = new Div({
 });
 ```
 
-```html
-<div class="test-element">
-  <p>This is a test of data-binding</p>
-  <ul>
-    <li>one</li>
-    <li>two</li>
-    <li>three</li>
-  </ul>
-</div>
-```
+#### Server-side
 
-#### Binding the data
+If you are server-side, you might need to pass additional data to the pipe.
 
-To bind data to an element, pass the data as the second argument in the `create` method.
+If the value you are piping is self-contained in the file, you can simply pipe directly to that data. If that data is imported from elsewhere, you will need to pass `data` and `path` values instead.
+
+The data is the reference to the data at time of render, and the path is the path to the file from the clieint-side so that the data can be imported at the time of re-render;
 
 ```js
-import Htmljs from "objekt";
+import { Component } from "./someComponent.html.js";
 
-const App = new Htmljs();
-
-const data = {
-  _id: "testData",
-  elementClass: "test-element",
-  elementText: "This is a test of data-binding",
-  children: ["one", "two", "three"],
-};
+const camelize = (str) => {
+  // a function that takes a string and turns it into camel case, for example
+}
 
 const element = new Div({
-  class: (data) => data.elementClass,
+  binding: "test",
+  pipe: {
+    camelize,
+    Component: {
+      data: Component,
+      path: "/path/to/someComponent.html.js",
+    }
+  }
+  class: (test) => test.class,
   children: [
-    new P((data) => data.elementText),
+    new P((test) => test.text),
     new Ul({
-      children: (data, e) => {
+      children: (test, elements, pipe) => {
+        const { Component, camelize } = pipe;
+        const { Li } = elements;
+
         const children = [];
 
-        data.children.forEach((child) => {
-          children.push(new e.Li(child));
+        test.children.forEach((child) => {
+          children.push(new Li(camelize(child)));
+        });
+
+        return children;
+      },
+    }),
+  ],
+});
+```
+
+### Updating the data
+
+To update the data, you can use the `objekt.set()` or `objekt.push()` methods.
+
+`objekt.set` allows you to push to any value of the data, assuming that data is set.
+
+```js
+objekt.push("test.class", "new-class");
+```
+
+`objekt.push` allows you to push to an array value within the data, assuming the value you are trying to push to is an array.
+
+```js
+objekt.push("test.children", "four");
+```
+
+Any element bound to the value being updated will be updated. However, if you have a binding that is more specific, that binding will run instead.
+
+```js
+objekt.data.set("test", {
+  class: "test-element",
+  text: "This is a test of data-binding",
+  children: ["one", "two", "three"],
+  name: {
+    first: "John",
+    last: "Doe",
+  }
+});
+
+const element = new Div({
+  binding: "test",
+  pipe: {
+    camelize,
+    Component: {
+      data: Component,
+      path: "/path/to/someComponent.html.js",
+    }
+  }
+  class: (test) => test.class,
+  children: [
+    new P((test) => test.text),
+    new Div({
+      binding: "test.name",
+      children: (name, element) => {
+        const { Span } = element;
+
+        return [new Span(name.first), new Span(name.last)];
+      }
+    }),
+    new Ul({
+      children: (test, elements, pipe) => {
+        const { Component, camelize } = pipe;
+        const { Li } = elements;
+
+        const children = [];
+
+        test.children.forEach((child) => {
+          children.push(new Li(camelize(child)));
         });
 
         return children;
@@ -284,80 +412,6 @@ const element = new Div({
   ],
 });
 
-App.create(element, data, (el) => document.body.appendChild(el));
+objekt.set("test.name.first", "Joe"); // will conly cause the "test-name" bound element to re-render
+objekt.set("test.class", "new-class"); // will cause the "test" bound elements to re-render
 ```
-
-```html
-<div class="test-element">
-  <p>This is a test of data-binding</p>
-  <ul>
-    <li>one</li>
-    <li>two</li>
-    <li>three</li>
-  </ul>
-</div>
-```
-
-#### Updating the data
-
-To update the data, you simply run the `update` method and pass in the new data. Data is identified by its `_id` key. This is to make updating data received from MongoDb requests simple. The updated data object does not have to be complete to update - it will only update the key/values that are present.
-
-```js
-const newData = {
-  _id: "testData",
-  children: [1, 2, 3, 4],
-};
-```
-
-```html
-<div class="test-element">
-  <p>This is a test of data-binding</p>
-  <ul>
-    <li>1</li>
-    <li>2</li>
-    <li>3</li>
-    <li>4</li>
-  </ul>
-</div>
-```
-
-#### Data-binding from the server
-
-You can send data-bound elements from the server. In your template files, define an export called `bindData` to define the data, and then bind in your html.js as you normally would
-
-```js
-
-import { layout } from "./layout.html.js";
-
-export const bindData = {
-  _id: "testData",
-  elementClass: "test-element",
-  elementText: "This is a test of data-binding",
-  children: ["one", "two", "three"],
-};
-
-export default (data) => {
-  return layout(data, {
-    id: "welcome",
-    child: new Div({
-      class: (data) => data.elementClass,
-      children: [
-        new P((data) => data.elementText),
-        new Ul({
-          children: (data, e) => {
-            const children = [];
-
-            data.children.forEach((child) => {
-              children.push(new e.Li(child));
-            });
-
-            return children;
-          },
-        }),
-      ],
-    });
-  });
-};
-```
-
-The element will arrive client-side with the data already rendered and the bindings in place as long as you are using the `Layout` element.
