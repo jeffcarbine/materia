@@ -2,6 +2,14 @@
 
 A lightweight JavaScript framework for rendering both server-side and client-side HTML.
 
+![npm](https://img.shields.io/npm/v/objekt)
+![license](https://img.shields.io/npm/l/objekt)
+![build](https://img.shields.io/travis/jeffcarbine/objekt)
+
+## Table of Contents
+
+- [Description](#description)
+- [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Import](#import)
 - [Elements](#elements)
@@ -17,8 +25,19 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
     - [Client-side Pipe](#client-side-pipe)
     - [Server-side Pipe](#server-side-pipe)
   - [Updating the data](#updating-the-data)
+- [Contributing](#contributing)
+- [License](#license)
+- [Contact](#contact)
 
-# Installation
+## Description
+
+Objekt is a lightweight JavaScript framework designed for rendering both server-side and client-side HTML. It includes a library of all valid HTML elements, including SVG elements, and provides a simple API for data binding and rendering.
+
+## Prerequisites
+
+- Node.js (version 12 or higher)
+
+## Installation
 
 You can install the package via npm:
 
@@ -44,7 +63,7 @@ const app = express();
 engine(express);
 ```
 
-# Elements
+## Elements
 
 Objekt includes a library of all 161 valid HTML elements, including SVG elements. You can import any of these elements from the included `elements` file.
 
@@ -61,7 +80,7 @@ const element = new Div({
 });
 ```
 
-## Properties
+### Properties
 
 Properties of an element in Objekt are the same as an Element in JavaScript, with a few exceptions listed below.
 
@@ -81,7 +100,7 @@ const alsoElement = new Div({
 // both create <div id="foo" tabindex="-1">Hello World</div>
 ```
 
-## Property Exceptions
+### Property Exceptions
 
 There are a few exceptions to this rule:
 
@@ -112,7 +131,7 @@ const element = new Div({
 });
 ```
 
-## Specialized Elements
+### Specialized Elements
 
 Objekt also includes a number of specialized elements to simplify the process:
 
@@ -122,7 +141,7 @@ Objekt also includes a number of specialized elements to simplify the process:
 - `HiddenInput`, `TextInput`, `SearchInput`, `TelInput`, `UrlInput`, `EmailInput`, `PasswordInput`, `DateInput`, `MonthInput`, `WeekInput`, `TimeInput`, `DateTimeLocalInput`, `NumberInput`, `RangeInput`, `ColorInput`, `CheckboxInput`, `RadioInput`, `ResetInput` all extend `Input` and add their appropriate `type`
 - `LazyImg` extends `Img` and adds `loading="lazy"`
 
-## Property Shorthands
+### Property Shorthands
 
 You can shorthand properties in an element by passing a single value into it, in the even that element only needs a certain single value
 
@@ -153,9 +172,9 @@ Some elments have unique shorthands:
 - Thead: array shorthand wraps each child in a Th() unless already wrapped, and wraps the children in a Tr(), unless already wrapped
 - Tbody: array shorthand wraps first child in a Th() and subsequent children in a Td() unless already wrapped, and wraps the children in a Tr(), unless already wrapped
 
-# Rendering
+## Rendering
 
-## Client-side Render
+### Client-side Render
 
 To client-side render, import `objekt` and call the `render()` method. `render()` takes in three parameters:
 
@@ -262,7 +281,7 @@ app.get("/", (req, res) => {
 });
 ```
 
-# Data Binding
+## Data Binding
 
 Data-bind functions are anonymous functions that run anytime a bound piece of data is updated on `objekt`.
 
@@ -292,11 +311,11 @@ const element = new Div({
 });
 ```
 
-## The Pipe
+### The Pipe
 
 Since the binding functions are anonymous, they don't inheritly have access to the values defined outside of it. In order to access external data, you need to first pipe it to your element.
 
-### Client-side Pipe
+#### Client-side Pipe
 
 If you are client-side, you can simply pass the values directly
 
@@ -329,7 +348,7 @@ const element = new Div({
 });
 ```
 
-### Server-side Pipe
+#### Server-side Pipe
 
 If you are server-side, you might need to pass additional data to the pipe.
 
@@ -374,7 +393,7 @@ const element = new Div({
 });
 ```
 
-## Updating the data
+### Updating the data
 
 To update the data, you can use the `objekt.set()` or `objekt.push()` methods.
 
@@ -443,3 +462,24 @@ const element = new Div({
 objekt.set("test.name.first", "Joe"); // will conly cause the "test-name" bound element to re-render
 objekt.set("test.class", "new-class"); // will cause the "test" bound elements to re-render
 ```
+
+## Contributing
+
+Contributions are welcome! If you have any ideas, suggestions, or bug reports, please open an issue on GitHub. If you would like to contribute code, you can do so by forking the repository and creating a pull request. Please ensure that your code follows the project's coding standards and includes appropriate tests.
+
+To contribute:
+
+1. Fork the repository.
+2. Create a new branch (`git checkout -b feature-branch`).
+3. Make your changes.
+4. Commit your changes (`git commit -m 'Add some feature'`).
+5. Push to the branch (`git push origin feature-branch`).
+6. Open a pull request.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Contact
+
+For questions or feedback, please contact [Jeff Carbine](mailto:jeff@carbine.co).
