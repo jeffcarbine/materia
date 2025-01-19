@@ -1,5 +1,13 @@
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Get the directory name of the current module file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Modules
-import objekt from "./objekt.js";
+import Objekt from "objekt";
+const objekt = new Objekt();
 
 /**
  * Handles an array value in the appData.
@@ -70,7 +78,7 @@ const handleAppData = async (appData) => {
 const viewCache = new Map();
 const registeredRoutes = new Set();
 
-export default async (app) => {
+export default async (app, objektName = "objekt") => {
   app.engine("html.js", (filePath, data, callback) => {
     if (viewCache.has(filePath)) {
       const cachedView = viewCache.get(filePath);
@@ -120,11 +128,17 @@ export default async (app) => {
   });
 
   app.set("view engine", "html.js");
+
+  // make the full objekt file importable client-side via /objekt.js
+  app.get("/objekt.js", (req, res) => {
+    res.sendFile(path.join(__dirname, "objekt.js"));
+  });
+  app.get("/objekt/elements", (req, res) => {
+    res.sendFile(path.join(__dirname, "elements.html.js"));
+  });
 };
 
 const renderView = async (view, data, callback) => {
-  objekt.init();
-
   if (typeof view.config === "function") {
     const config = view.config(data);
     if (config && typeof config === "object") {

@@ -1,6 +1,6 @@
 {
   "name": "objekt",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Server-side and client-side framework for building lightweight websites and apps",
   "type": "module",
   "exports": {
