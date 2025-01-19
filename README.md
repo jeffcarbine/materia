@@ -2,7 +2,23 @@
 
 A lightweight JavaScript framework for rendering both server-side and client-side HTML.
 
-## Installation
+- [Installation](#installation)
+- [Import](#import)
+- [Elements](#elements)
+  - [Properties](#properties)
+  - [Property Exceptions](#property-exceptions)
+  - [Specialized Elements](#specialized-elements)
+  - [Property Shorthands](#property-shorthands)
+- [Rendering](#rendering)
+  - [Client-side Render](#client-side-render)
+  - [Server-side Render](#server-side-render)
+- [Data Binding](#data-binding)
+  - [The Pipe](#the-pipe)
+    - [Client-side Pipe](#client-side-pipe)
+    - [Server-side Pipe](#server-side-pipe)
+  - [Updating the data](#updating-the-data)
+
+# Installation
 
 You can install the package via npm:
 
@@ -28,7 +44,7 @@ const app = express();
 engine(express);
 ```
 
-## Elements
+# Elements
 
 Objekt includes a library of all 161 valid HTML elements, including SVG elements. You can import any of these elements from the included `elements` file.
 
@@ -45,7 +61,7 @@ const element = new Div({
 });
 ```
 
-### Properties
+## Properties
 
 Properties of an element in Objekt are the same as an Element in JavaScript, with a few exceptions listed below.
 
@@ -65,7 +81,7 @@ const alsoElement = new Div({
 // both create <div id="foo" tabindex="-1">Hello World</div>
 ```
 
-### Property Exceptions
+## Property Exceptions
 
 There are a few exceptions to this rule:
 
@@ -96,7 +112,7 @@ const element = new Div({
 });
 ```
 
-### Specialized Elements
+## Specialized Elements
 
 Objekt also includes a number of specialized elements to simplify the process:
 
@@ -106,7 +122,7 @@ Objekt also includes a number of specialized elements to simplify the process:
 - `HiddenInput`, `TextInput`, `SearchInput`, `TelInput`, `UrlInput`, `EmailInput`, `PasswordInput`, `DateInput`, `MonthInput`, `WeekInput`, `TimeInput`, `DateTimeLocalInput`, `NumberInput`, `RangeInput`, `ColorInput`, `CheckboxInput`, `RadioInput`, `ResetInput` all extend `Input` and add their appropriate `type`
 - `LazyImg` extends `Img` and adds `loading="lazy"`
 
-### Property Shorthands
+## Property Shorthands
 
 You can shorthand properties in an element by passing a single value into it, in the even that element only needs a certain single value
 
@@ -136,6 +152,8 @@ Some elments have unique shorthands:
 - Dl: array shorthand wraps each child in a Dt(), unless already wrapped
 - Thead: array shorthand wraps each child in a Th() unless already wrapped, and wraps the children in a Tr(), unless already wrapped
 - Tbody: array shorthand wraps first child in a Th() and subsequent children in a Td() unless already wrapped, and wraps the children in a Tr(), unless already wrapped
+
+# Rendering
 
 ## Client-side Render
 
@@ -244,7 +262,7 @@ app.get("/", (req, res) => {
 });
 ```
 
-## Data Binding
+# Data Binding
 
 Data-bind functions are anonymous functions that run anytime a bound piece of data is updated on `objekt`.
 
@@ -274,11 +292,11 @@ const element = new Div({
 });
 ```
 
-### The Pipe
+## The Pipe
 
 Since the binding functions are anonymous, they don't inheritly have access to the values defined outside of it. In order to access external data, you need to first pipe it to your element.
 
-#### Client-side
+### Client-side Pipe
 
 If you are client-side, you can simply pass the values directly
 
@@ -311,7 +329,7 @@ const element = new Div({
 });
 ```
 
-#### Server-side
+### Server-side Pipe
 
 If you are server-side, you might need to pass additional data to the pipe.
 
@@ -356,7 +374,7 @@ const element = new Div({
 });
 ```
 
-### Updating the data
+## Updating the data
 
 To update the data, you can use the `objekt.set()` or `objekt.push()` methods.
 
