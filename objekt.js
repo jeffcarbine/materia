@@ -1123,9 +1123,7 @@ class Objekt {
           
         const handlers = JSON.parse("${this.#stringifyObject(this.#handlers)}");
           
-        const delegates = JSON.parse("${this.#stringifyObject(
-          this.#delegate
-        )}");
+        const delegate = JSON.parse("${this.#stringifyObject(this.#delegate)}");
           
         window.objekt = new Objekt({data, endpoints, handlers, delegate});
       `;
