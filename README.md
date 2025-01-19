@@ -4,7 +4,6 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
 
 ![npm](https://img.shields.io/npm/v/objekt)
 ![license](https://img.shields.io/npm/l/objekt)
-![build](https://img.shields.io/travis/jeffcarbine/objekt)
 
 ## Table of Contents
 
