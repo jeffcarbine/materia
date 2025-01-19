@@ -1,11 +1,13 @@
 // Import all the elements
-import * as e from "objekt/elements";
+import * as elements from "objekt/elements";
 
 // Standard Library Imports
 let document, fs;
 
+// Allows for client-side an server-side only behaviors
 const isServer = typeof window === "undefined";
 
+// Set up jsdom and fs for server-side rendering
 if (isServer) {
   Promise.all([import("jsdom"), import("fs")])
     .then(([jsdom, fsModule]) => {
@@ -26,35 +28,28 @@ export function Bind(callback) {
 }
 
 /**
- * The main html.js object.
+ * The main Objekt class.
+ * @class Objekt
+ * @param {Object} params - The parameters for the Objekt class when initializing.
+ * @param {Object} params.data - The data object for the data bindings.
+ * @param {Object} params.endpoints - The endpoints for updating the data.
+ * @param {Object} params.handlers - The handlers object for the template engine.
+ * @param {Object} params.delegate - The delegate object for the event delegation.
+ * @returns {Objekt} The Objekt class.
  */
 class Objekt {
   constructor(params) {
     if (!isServer) {
-      // Main function to initialize the app
+      // Get the data, endpoints, and handlers from the params
+      const { data, endpoints, handlers, delegate } = params;
 
-      const { data, endpoints, handlers } = params;
-
+      // Set the data, endpoints, and handlers
       this.#data = data;
       this.#endpoints = endpoints;
       this.#handlers = handlers;
-
-      const delegateElements = document.querySelectorAll(
-        "[data-event-delegates]"
-      );
-
-      delegateElements.forEach((element) => {
-        const eventDelegates = JSON.parse(element.dataset.eventDelegates);
-        eventDelegates.forEach(({ event, func }) => {
-          // turn the func from a string back into an anonymous function
-          const restoredFunc = new Function("objekt", `return ${func}`)(objekt);
-          this.#addEventDelegate(element, event, restoredFunc);
-        });
-      });
+      this.#delegate = delegate;
 
       this.#enableEventDelegation();
-
-      this.mutationObserver = new MutationObserver(this.#mutationCallback);
     }
   }
 
@@ -63,6 +58,9 @@ class Objekt {
    */
   #handlers = {};
 
+  /**
+   * Whether we are processing data from the server at the moment.
+   */
   #fromServer = false;
 
   /**
@@ -83,7 +81,11 @@ class Objekt {
     return value;
   }
 
-  // splits a binidng into hook and tether
+  /**
+   * Splits a binding into a hook and tether.
+   * @param {string} binding - The binding to split.
+   * @returns {Object} The hook and tether of the binding.
+   */
   #splitBinding(binding) {
     const parts = binding.split(".");
     const hook = parts.shift();
@@ -91,6 +93,11 @@ class Objekt {
     return { hook, tether };
   }
 
+  /**
+   * Sets the value for a binding.
+   * @param {string} binding - The binding to set the value for.
+   * @param {*} value - The value to set for the binding.
+   */
   set(binding, value) {
     const keys = binding.split(/[\.\[\]]/).filter(Boolean),
       hook = keys[0];
@@ -112,6 +119,11 @@ class Objekt {
     this.#handleBindingUpdate(binding);
   }
 
+  /**
+   * Pushes a value to a binding if it is an array
+   * @param {string} binding - The binding to push the value to.
+   * @param {*} value - The value to push to the binding.
+   */
   push(binding, value) {
     const keys = binding.split(/[\.\[\]]/).filter(Boolean),
       hook = keys[0];
@@ -143,6 +155,10 @@ class Objekt {
     }
   }
 
+  /**
+   * Runs the handlers if a binding is updated via set or push
+   * @param {string} binding - The binding to update.
+   */
   #handleBindingUpdate(binding) {
     const checkHandlers = (binding) => {
       if (this.#handlers[binding]) {
@@ -170,7 +186,10 @@ class Objekt {
     }
   }
 
-  // Store timeouts for each binding
+  /**
+   * The timeouts for synchronizing the data with the server.
+   * Debounces the requests to the server.
+   */
   syncTimeouts = {};
 
   /**
@@ -239,12 +258,14 @@ class Objekt {
 
   /**
    * Lets you check to see what the data is currently at
+   * @returns {Object} The review object, which contains the data, handlers, endpoints and delegate.
    */
   review() {
     return {
       data: this.#data,
       handlers: this.#handlers,
       endpoints: this.#endpoints,
+      delegate: this.#delegate,
     };
   }
 
@@ -456,8 +477,17 @@ class Objekt {
     }
   }
 
+  /**
+   * Stores imported components so they aren't imported multiple times
+   * @type {Object}
+   */
   importedComponents = {};
 
+  /**
+   * Processes a handler for a binding
+   * @param {string} binding - The binding to process the handler for.
+   * @param {Object} handler - The handler to process.
+   */
   async #handle(binding, handler) {
     let { element, func, property, pipe } = handler;
 
@@ -501,7 +531,7 @@ class Objekt {
       }
     }
 
-    value = func(this.get(binding), e, pipe);
+    value = func(this.get(binding), elements, pipe);
 
     if (typeof element === "string") {
       element = document.querySelector("[data-handler-id=" + element + "]");
@@ -511,8 +541,14 @@ class Objekt {
     this.#setElementAttribute(element, property, value);
   }
 
-  delegate = {};
+  /**
+   * The delegate object for the event delegation.
+   */
+  #delegate = {};
 
+  /**
+   * The types of events that can be delegated.
+   */
   #eventTypes = [
     "click",
     "dblclick",
@@ -557,40 +593,46 @@ class Objekt {
    * @param {Function} func - The function to run when the event is triggered
    */
   #addEventDelegate(element, event, func) {
-    // if this is the server, store the event delegate data on the element itself
-    if (isServer) {
-      if (!element.dataset.eventDelegates) {
-        element.dataset.eventDelegates = JSON.stringify([]);
-      }
-
-      let eventDelegates = JSON.parse(element.dataset.eventDelegates);
-
-      eventDelegates.push({ event, func: func.toString() });
-
-      element.dataset.eventDelegates = JSON.stringify(eventDelegates);
+    // first, we need to check what kind of event is being registered
+    // -- if it is a load or resize function that are being set to the
+    // window, then they need to be handled differently and just get
+    // pushed to their corresponding arrays
+    if (event.indexOf("load") > -1 && element === window) {
+      onloadFunctions.push(func);
+    } else if (event.indexOf("resize") > -1 && element === window) {
+      onresizeFunctions.push(func);
+    } else if (event.indexOf("scroll") > -1 && element === window) {
+      scrollFunctions.push(func);
     } else {
-      // first, we need to check what kind of event is being registered
-      // -- if it is a load or resize function that are being set to the
-      // window, then they need to be handled differently and just get
-      // pushed to their corresponding arrays
-      if (event.indexOf("load") > -1 && element === window) {
-        onloadFunctions.push(func);
-      } else if (event.indexOf("resize") > -1 && element === window) {
-        onresizeFunctions.push(func);
-      } else if (event.indexOf("scroll") > -1 && element === window) {
-        scrollFunctions.push(func);
-      } else {
-        this.#registerEvent(event, element, func, true);
+      let target = element;
+
+      if (isServer) {
+        // create a unique id for the element
+        const delegateId = this.#generateUniqueId();
+
+        // set the delegate id on the element
+        element.dataset.delegateId = delegateId;
+
+        target = delegateId;
       }
+
+      this.#registerEvent(event, target, func, true);
     }
   }
 
+  /**
+   * Registers an event for an element
+   * @param {string} event - The event to register
+   * @param {Element} target - The target element to register the event for
+   * @param {Function} func - The function to run when the event is triggered
+   * @param {boolean} preventDefault - Whether to prevent the default behavior of the event
+   */
   #registerEvent(event, target, func, preventDefault) {
     // check to see if the object already has an instance of the event (which, if it does, it means we have already
     // registered an Event Listener for it)
-    if (this.delegate[event] === undefined) {
+    if (this.#delegate[event] === undefined) {
       // if it doesn't, then set that delegate event to an empty array
-      this.delegate[event] = [];
+      this.#delegate[event] = [];
     }
 
     const eventData = {
@@ -603,9 +645,14 @@ class Objekt {
       eventData.name = func.name;
     }
 
-    this.delegate[event].push(eventData);
+    this.#delegate[event].push(eventData);
   }
 
+  /**
+   * Checks to see if an element is a descendant of another element
+   * @param {Element} parent - The parent element
+   * @param {Element} child - The child element
+   */
   #isDescendant(parent, child) {
     let node = child;
     while (node !== null) {
@@ -617,10 +664,19 @@ class Objekt {
     return false;
   }
 
+  /**
+   * Checks to see if an event matches the element
+   * @param {Event} event - The event to check
+   * @param {Element} element - The element to check
+   */
   #eventMatches(event, element) {
     return this.#isDescendant(element, event.target);
   }
 
+  /**
+   * Handles an event
+   * @param {Event} event - The event to handle
+   */
   #eventHandler(event) {
     // empty eventObj so we can properly pass what
     // delegate event we are going to match this event to
@@ -632,11 +688,11 @@ class Objekt {
       // if it is the enter key...
       if (key === 13) {
         // .. then we treat it like a click
-        eventArr = this.delegate.click;
+        eventArr = this.#delegate.click;
       }
     } else {
       // otherwise, just get the matching event object
-      eventArr = this.delegate[event.type];
+      eventArr = this.#delegate[event.type];
     }
 
     eventArr.forEach((eventObj) => {
@@ -668,12 +724,24 @@ class Objekt {
 
         // run the function and pass the target
         if (!disabled) {
+          // if the target is a string, then we need to get the element
+          // and update the delegate
+          if (typeof target === "string") {
+            target = document.querySelector(
+              "[data-delegate-id=" + target + "]"
+            );
+            eventObj.target = target;
+          }
+
           func(target, event);
         }
       }
     });
   }
 
+  /**
+   * The mutation configuration for the mutation observer.
+   */
   #mutationConfig = {
     attributes: true,
     attributeFilter: [
@@ -693,7 +761,10 @@ class Objekt {
     characterData: true,
   };
 
-  // check to see if an event is a mutation or not
+  /**
+   * Checks if a mutation is valid
+   * @param {string} event - The event to check
+   */
   #isValidMutation(event) {
     if (event === "childList" || event.includes("attributes")) {
       return true;
@@ -702,37 +773,54 @@ class Objekt {
     }
   }
 
-  // Callback function to execute when mutations are observed
+  /**
+   * The mutation callback for the mutation observer.
+   * @param {MutationRecord[]} mutationsList - The list of mutations to process.
+   */
   #mutationCallback(mutationsList) {
-    function runCallback() {
-      for (var i = 0; i < mutationsList.length; i++) {
-        let mutation = mutationsList[i];
+    for (var i = 0; i < mutationsList.length; i++) {
+      let mutation = mutationsList[i];
 
-        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-          this.#executeCheck(mutation);
-        } else if (mutation.type === "attributes") {
-          this.#executeCheck(mutation);
-        } else if (mutation.type === "characterData") {
-          this.#executeCheck(mutation);
-        }
+      if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+        this.#executeCheck(mutation);
+      } else if (mutation.type === "attributes") {
+        this.#executeCheck(mutation);
+      } else if (mutation.type === "characterData") {
+        this.#executeCheck(mutation);
       }
     }
-
-    runCallback();
   }
 
+  /**
+   * Whether we are observing mutations.
+   */
   #observingMutations = false;
 
+  /**
+   * The mutation observer for observing mutations.
+   * Is set to null initially, and then created when event delegationis enabled
+   * via the #observeMutations function
+   */
   #observer = null;
 
+  /**
+   * Starts observing mutations.
+   */
   #observeMutations() {
     // Select the node that will be observed for mutations
     const targetNode = document.querySelector("body");
+
+    // Create an observer instance linked to the callback function
+    this.#observer = new MutationObserver(this.#mutationCallback);
 
     // Start observing the target node for configured mutations
     this.#observer.observe(targetNode, this.#mutationConfig);
   }
 
+  /**
+   * Executes a check for a mutation
+   * @param {MutationRecord} mutation - The mutation to check
+   */
   #executeCheck(mutation) {
     let mutationTarget = mutation.target;
 
@@ -777,8 +865,11 @@ class Objekt {
     }
   }
 
+  /**
+   * Enables event delegation on the client side
+   */
   #enableEventDelegation() {
-    for (var event in this.delegate) {
+    for (var event in this.#delegate) {
       // if it is a mutation, then we don't need to register an event with the document
       // because mutations are handled below by our mutationObserver
       if (!this.#isValidMutation(event)) {
@@ -838,22 +929,7 @@ class Objekt {
           value = this.#parseStringifiedFunction(value);
         }
 
-        // bandle binding stuff
         let binding = template.binding;
-
-        // if (typeof value === "function" && !binding) {
-        //   // if binding is undefined, then assume the first parameter in the function is the binding
-
-        //   // get the function parameters
-        //   const funcString = value.toString();
-        //   const params = funcString.substring(
-        //     funcString.indexOf("(") + 1,
-        //     funcString.indexOf(")")
-        //   );
-
-        //   // get the first parameter
-        //   binding = params.split(",")[0].trim();
-        // }
 
         if (typeof value === "function") {
           // if the binding is undefined, we need to alert the user and continue the render
@@ -881,6 +957,7 @@ class Objekt {
     if (isServer && depth === 0) {
       return this.#handleServerSideRendering(element);
     } else {
+      // handle client-side rendering
       if (callbackOrQuery) {
         if (typeof callbackOrQuery === "function") {
           callbackOrQuery(element);
@@ -1007,11 +1084,23 @@ class Objekt {
       pipe,
     });
 
-    const result = preservedFunc(this.get(binding), e, clientPipe);
+    const result = preservedFunc(this.get(binding), elements, clientPipe);
 
     if (result !== null) {
       this.#setElementAttribute(element, property, result, depth);
     }
+  }
+
+  /**
+   * Escapes a string so it can be safely stringified for client side rendering
+   * @param {string} str - The string to escape.
+   */
+  #stringifyObject(obj) {
+    return JSON.stringify(obj)
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r");
   }
 
   /**
@@ -1026,25 +1115,19 @@ class Objekt {
         const rootUrl = window.location.origin + "/objekt.js";
         const Objekt = (await import(rootUrl)).default;
 
-        const data = JSON.parse("${JSON.stringify(this.#data)
-          .replace(/\\/g, "\\\\")
-          .replace(/"/g, '\\"')
-          .replace(/\n/g, "\\n")
-          .replace(/\r/g, "\\r")}");
+        const data = JSON.parse("${this.#stringifyObject(this.#data)}");
           
-        const endpoints = JSON.parse("${JSON.stringify(this.#endpoints)
-          .replace(/\\/g, "\\\\")
-          .replace(/"/g, '\\"')
-          .replace(/\n/g, "\\n")
-          .replace(/\r/g, "\\r")}");
+        const endpoints = JSON.parse("${this.#stringifyObject(
+          this.#endpoints
+        )}");
           
-        const handlers = JSON.parse("${JSON.stringify(this.#handlers)
-          .replace(/\\/g, "\\\\")
-          .replace(/"/g, '\\"')
-          .replace(/\n/g, "\\n")
-          .replace(/\r/g, "\\r")}");
+        const handlers = JSON.parse("${this.#stringifyObject(this.#handlers)}");
           
-        window.objekt = new Objekt({data, endpoints, handlers});
+        const delegates = JSON.parse("${this.#stringifyObject(
+          this.#delegate
+        )}");
+          
+        window.objekt = new Objekt({data, endpoints, handlers, delegate});
       `;
 
       script.setAttribute("type", "module");
