@@ -1,5 +1,5 @@
 // Import all the elements
-import * as elements from "materia/elements";
+import * as elements from "@jeffcarbine/materia/elements";
 
 // Standard Library Imports
 let document, fs;
