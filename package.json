@@ -1,6 +1,6 @@
 {
-  "name": "@jeffcarbine/materia",
-  "version": "1.0.7",
+  "name": "materiajs",
+  "version": "1.0.8",
   "description": "Server-side and client-side framework for building lightweight websites and apps",
   "type": "module",
   "exports": {

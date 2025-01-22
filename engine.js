@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Modules
-import Materia from "@jeffcarbine/materia";
+import Materia from "materiajs";
 const materia = new Materia();
 
 /**
@@ -133,7 +133,7 @@ export default async (app, materiaName = "materia") => {
   app.get("/materia.js", (req, res) => {
     res.sendFile(path.join(__dirname, "materia.js"));
   });
-  app.get("/materia/elements", (req, res) => {
+  app.get("/materiajs/elements", (req, res) => {
     res.sendFile(path.join(__dirname, "elements.html.js"));
   });
 };

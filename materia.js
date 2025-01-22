@@ -1,5 +1,5 @@
 // Import all the elements
-import * as elements from "@jeffcarbine/materia/elements";
+import * as elements from "materiajs/elements";
 
 // Standard Library Imports
 let document, fs;
@@ -156,13 +156,52 @@ class Materia {
   }
 
   /**
+   * Finds a matching value in an array and updates it, or
+   * adds the value to the array if it doesn't exist.
+   */
+  setInArray(binding, query, value) {
+    // Get the value from the binding
+    const target = this.get(binding);
+
+    if (!target) {
+      console.error(`Error: ${binding} is not defined.`);
+      return;
+    }
+
+    if (!Array.isArray(target)) {
+      console.error(`Error: ${binding} is not an array.`);
+      return;
+    }
+
+    // Define the queryFunction
+    const queryFunction = (query) => {
+      return (element) => {
+        return Object.keys(query).every((key) => element[key] === query[key]);
+      };
+    };
+
+    const arrayIndex = target.findIndex(queryFunction(query));
+
+    if (arrayIndex > -1) {
+      target[arrayIndex] = value;
+    } else {
+      target.push(value);
+    }
+
+    const updatedIndex = arrayIndex > -1 ? arrayIndex : target.length - 1;
+    this.#handleBindingUpdate(`${binding}[${updatedIndex}]`);
+  }
+
+  /**
    * Runs the handlers if a binding is updated via set or push
    * @param {string} binding - The binding to update.
    */
   #handleBindingUpdate(binding) {
-    const checkHandlers = (binding) => {
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const checkHandlers = async (binding) => {
       if (this.#handlers[binding]) {
-        this.#handlers[binding].forEach((handler) => {
+        for (const handler of this.#handlers[binding]) {
           this.#handle(binding, handler);
 
           if (!this.#fromServer) {
@@ -172,11 +211,14 @@ class Materia {
               this.#syncWithServer(binding);
             }
           }
-        });
+
+          // Add a delay of 5 seconds between each handler
+          await delay(0);
+        }
       } else {
         const parentBinding = binding.replace(/(\.[^\.]*|\[\d+\])$/, "");
         if (parentBinding !== binding) {
-          checkHandlers(parentBinding);
+          await checkHandlers(parentBinding);
         }
       }
     };
@@ -510,8 +552,8 @@ class Materia {
     // check to see if any of the pipe values are strings that need to be imported
     if (pipe) {
       for (let key in pipe) {
-        if (typeof pipe[key] === "string") {
-          const path = pipe[key];
+        if (typeof pipe[key] === "string" && pipe[key].startsWith("import::")) {
+          const path = pipe[key].replace("import::", "");
 
           // Check if the component is already imported
           if (this.importedComponents[path]) {
@@ -525,8 +567,8 @@ class Materia {
               const component = module[key] || module.default;
 
               if (component) {
-                pipe[key] = component;
                 this.importedComponents[path] = component;
+                pipe[key] = component;
               } else {
                 console.error(`Component ${key} not found in ${path}`);
               }
@@ -541,7 +583,8 @@ class Materia {
     value = func(this.get(binding), elements, pipe);
 
     if (typeof element === "string") {
-      element = document.querySelector("[data-handler-id=" + element + "]");
+      const query = "[data-handler-id='" + element + "']";
+      element = document.querySelector(query);
       handler.element = element;
     }
 
@@ -748,7 +791,7 @@ class Materia {
 
         // run the function and pass the target
         if (!disabled) {
-          func(target, event);
+          func(event);
         }
       }
     });
@@ -1099,7 +1142,7 @@ class Materia {
 
           if (typeof value === "object" && value.data && value.path) {
             // assign the data to the clientPipe
-            pipe[key] = value.path;
+            pipe[key] = "import::" + value.path;
           } else {
             pipe[key] = value;
           }
@@ -1180,7 +1223,7 @@ class Materia {
         importMap.type = "importmap";
         importMap.textContent = JSON.stringify({
           imports: {
-            "@jeffcarbine/materia/elements": "/materia/elements",
+            "materiajs/elements": "/materiajs/elements",
           },
         });
         head.appendChild(importMap);

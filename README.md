@@ -2,8 +2,8 @@
 
 A lightweight JavaScript framework for rendering both server-side and client-side HTML.
 
-![npm](https://img.shields.io/npm/v/materia)
-![license](https://img.shields.io/npm/l/materia)
+![npm](https://img.shields.io/npm/v/materiajs)
+![license](https://img.shields.io/npm/l/materiajs)
 
 ## Table of Contents
 
@@ -49,13 +49,13 @@ npm i materia
 To use Materia directly, import it into your project.
 
 ```js
-import materia from "@jeffcarbine/materia";
+import materia from "materiajs";
 ```
 
 If you wish to use server-side rendering, import the engine into your project
 
 ```js
-import engine from "@jeffcarbine/materia/engine";
+import engine from "materiajs/engine";
 import express from "express";
 
 const app = express();
@@ -67,7 +67,7 @@ engine(express);
 Materia includes a library of all 161 valid HTML elements, including SVG elements. You can import any of these elements from the included `elements` file.
 
 ```js
-import { Div, H1, Img, P } from "@jeffcarbine/materia/elements";
+import { Div, H1, Img, P } from "materiajs/elements";
 
 const element = new Div({
   class: "card",
@@ -182,7 +182,7 @@ To client-side render, import `materia` and call the `render()` method. `render(
 - either a target to append the rendered element to, or a callback function
 
 ```js
-import materia from "@jeffcarbine/materia";
+import materia from "materiajs";
 
 // renders an element and runs a callback
 materia.create(new H1("Hello World"), (element) =>
@@ -208,7 +208,7 @@ Materia can server-side rener your layouts. The filename extension that Materia 
 To server-side render, import the engine
 
 ```js
-import engine from "@jeffcarbine/materia/engine";
+import engine from "materiajs/engine";
 import express from "express";
 
 const app = express();
