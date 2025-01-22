@@ -470,7 +470,7 @@ const validAttributes = [
   "open",
   "close",
 
-  // objekt specific attributes
+  // materia specific attributes
   "if",
   "child",
   "children",

@@ -1,9 +1,9 @@
-# Objekt
+# Materia
 
 A lightweight JavaScript framework for rendering both server-side and client-side HTML.
 
-![npm](https://img.shields.io/npm/v/objekt)
-![license](https://img.shields.io/npm/l/objekt)
+![npm](https://img.shields.io/npm/v/materia)
+![license](https://img.shields.io/npm/l/materia)
 
 ## Table of Contents
 
@@ -30,7 +30,7 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
 
 ## Description
 
-Objekt is a lightweight JavaScript framework designed for rendering both server-side and client-side HTML. It includes a library of all valid HTML elements, including SVG elements, and provides a simple API for data binding and rendering.
+Materia is a lightweight JavaScript framework designed for rendering both server-side and client-side HTML. It includes a library of all valid HTML elements, including SVG elements, and provides a simple API for data binding and rendering.
 
 ## Prerequisites
 
@@ -41,21 +41,21 @@ Objekt is a lightweight JavaScript framework designed for rendering both server-
 You can install the package via npm:
 
 ```sh
-npm i objekt
+npm i materia
 ```
 
 ## Import
 
-To use Objekt directly, import it into your project.
+To use Materia directly, import it into your project.
 
 ```js
-import objekt from "objekt";
+import materia from "materia";
 ```
 
 If you wish to use server-side rendering, import the engine into your project
 
 ```js
-import engine from "objekt/engine";
+import engine from "materia/engine";
 import express from "express";
 
 const app = express();
@@ -64,10 +64,10 @@ engine(express);
 
 ## Elements
 
-Objekt includes a library of all 161 valid HTML elements, including SVG elements. You can import any of these elements from the included `elements` file.
+Materia includes a library of all 161 valid HTML elements, including SVG elements. You can import any of these elements from the included `elements` file.
 
 ```js
-import { Div, H1, Img, P } from "objekt/elements";
+import { Div, H1, Img, P } from "materia/elements";
 
 const element = new Div({
   class: "card",
@@ -81,7 +81,7 @@ const element = new Div({
 
 ### Properties
 
-Properties of an element in Objekt are the same as an Element in JavaScript, with a few exceptions listed below.
+Properties of an element in Materia are the same as an Element in JavaScript, with a few exceptions listed below.
 
 ```js
 const element = document.querySelector("#element");
@@ -132,7 +132,7 @@ const element = new Div({
 
 ### Specialized Elements
 
-Objekt also includes a number of specialized elements to simplify the process:
+Materia also includes a number of specialized elements to simplify the process:
 
 - `Stylesheet` extends `Link` - adds `rel="stylesheet"` automatically
 - `PreLoadStyle` extends `Link` - adds `rel`, `as`, and `onload` to pre-load stylesheets
@@ -175,47 +175,47 @@ Some elments have unique shorthands:
 
 ### Client-side Render
 
-To client-side render, import `objekt` and call the `render()` method. `render()` takes in three parameters:
+To client-side render, import `materia` and call the `render()` method. `render()` takes in three parameters:
 
 - the object to render
 - the data to data-bind (optional)
 - either a target to append the rendered element to, or a callback function
 
 ```js
-import objekt from "objekt";
+import materia from "materia";
 
 // renders an element and runs a callback
-objekt.create(new H1("Hello World"), (element) =>
+materia.create(new H1("Hello World"), (element) =>
   document.body.appendChild(element)
 );
 
 // renders an element with attached data and runs a callback
-objekt.create(new H1("Hello World"), {foo: "bar"}, (element) =>
+materia.create(new H1("Hello World"), {foo: "bar"}, (element) =>
   document.body.appendChild(element)
 );
 
 // renders an element with attached data and appends it to "body"
-objekt.create(new H1("Hello World"), {foo: "bar"}, "body";
+materia.create(new H1("Hello World"), {foo: "bar"}, "body";
 
 // renders an element and appends it to "body"
-objekt.create(new H1("Hello World"), "body";
+materia.create(new H1("Hello World"), "body";
 ```
 
 ## Server-side Render
 
-Objekt can server-side rener your layouts. The filename extension that Objekt looks for is `.html.js`.
+Materia can server-side rener your layouts. The filename extension that Materia looks for is `.html.js`.
 
 To server-side render, import the engine
 
 ```js
-import engine from "objekt/engine";
+import engine from "materia/engine";
 import express from "express";
 
 const app = express();
 engine(express);
 ```
 
-And then you can write your views using Objekt with the extension of `.html.js`. Objekt templates export a default function with a parameter of `data`, which contains the data being sent from the server.
+And then you can write your views using Materia with the extension of `.html.js`. Materia templates export a default function with a parameter of `data`, which contains the data being sent from the server.
 
 ```js
 /// index.html.js
@@ -282,18 +282,18 @@ app.get("/", (req, res) => {
 
 ## Data Binding
 
-Data-bind functions are anonymous functions that run anytime a bound piece of data is updated on `objekt`.
+Data-bind functions are anonymous functions that run anytime a bound piece of data is updated on `materia`.
 
 To data-bind, pass an anonymous function to an element's property. The anonymous function accepts three parameters:
 
 - The data being bound
-- The `objekt/elements` library of elements
+- The `materia/elements` library of elements
 - The piped data to the function
 
-To start, you need to add data to `objekt.data` using the `.set()` method. The first parameter of the `set()` function is known as the `binding`.
+To start, you need to add data to `materia.data` using the `.set()` method. The first parameter of the `set()` function is known as the `binding`.
 
 ```js
-objekt.data.set("test", {
+materia.data.set("test", {
   class: "test-element",
   text: "This is a test of data-binding",
   children: ["one", "two", "three"],
@@ -394,24 +394,24 @@ const element = new Div({
 
 ### Updating the data
 
-To update the data, you can use the `objekt.set()` or `objekt.push()` methods.
+To update the data, you can use the `materia.set()` or `materia.push()` methods.
 
-`objekt.set` allows you to push to any value of the data, assuming that data is set.
+`materia.set` allows you to push to any value of the data, assuming that data is set.
 
 ```js
-objekt.push("test.class", "new-class");
+materia.push("test.class", "new-class");
 ```
 
-`objekt.push` allows you to push to an array value within the data, assuming the value you are trying to push to is an array.
+`materia.push` allows you to push to an array value within the data, assuming the value you are trying to push to is an array.
 
 ```js
-objekt.push("test.children", "four");
+materia.push("test.children", "four");
 ```
 
 Any element bound to the value being updated will be updated. However, if you have a binding that is more specific, that binding will run instead.
 
 ```js
-objekt.data.set("test", {
+materia.data.set("test", {
   class: "test-element",
   text: "This is a test of data-binding",
   children: ["one", "two", "three"],
@@ -458,8 +458,8 @@ const element = new Div({
   ],
 });
 
-objekt.set("test.name.first", "Joe"); // will conly cause the "test-name" bound element to re-render
-objekt.set("test.class", "new-class"); // will cause the "test" bound elements to re-render
+materia.set("test.name.first", "Joe"); // will conly cause the "test-name" bound element to re-render
+materia.set("test.class", "new-class"); // will cause the "test" bound elements to re-render
 ```
 
 ## Contributing

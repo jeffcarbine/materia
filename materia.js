@@ -1,5 +1,5 @@
 // Import all the elements
-import * as elements from "objekt/elements";
+import * as elements from "materia/elements";
 
 // Standard Library Imports
 let document, fs;
@@ -28,16 +28,16 @@ export function Bind(callback) {
 }
 
 /**
- * The main Objekt class.
- * @class Objekt
- * @param {Object} params - The parameters for the Objekt class when initializing.
+ * The main Materia class.
+ * @class Materia
+ * @param {Object} params - The parameters for the Materia class when initializing.
  * @param {Object} params.data - The data object for the data bindings.
  * @param {Object} params.endpoints - The endpoints for updating the data.
  * @param {Object} params.handlers - The handlers object for the template engine.
  * @param {Object} params.delegate - The delegate object for the event delegation.
- * @returns {Objekt} The Objekt class.
+ * @returns {Materia} The Materia class.
  */
-class Objekt {
+class Materia {
   constructor(params) {
     if (!isServer) {
       // Get the data, endpoints, and handlers from the params
@@ -616,6 +616,10 @@ class Objekt {
         target = delegateId;
       }
 
+      if (isServer) {
+        func = this.#stringifyFunction(func);
+      }
+
       this.#registerEvent(event, target, func, true);
     }
   }
@@ -696,7 +700,20 @@ class Objekt {
     }
 
     eventArr.forEach((eventObj) => {
-      const { target, func, preventDefault } = eventObj;
+      let { target, func, preventDefault } = eventObj;
+
+      // if the target is a string, then we need to get the element
+      // and update the delegate
+      if (typeof target === "string") {
+        target = document.querySelector("[data-delegate-id=" + target + "]");
+        eventObj.target = target;
+      }
+
+      // if the function is a stringified function, we need to parse it
+      if (typeof func === "string") {
+        func = this.#parseStringifiedFunction(func);
+        eventObj.func = func;
+      }
 
       // check whether the element or it's direct parent match
       // the key
@@ -724,15 +741,6 @@ class Objekt {
 
         // run the function and pass the target
         if (!disabled) {
-          // if the target is a string, then we need to get the element
-          // and update the delegate
-          if (typeof target === "string") {
-            target = document.querySelector(
-              "[data-delegate-id=" + target + "]"
-            );
-            eventObj.target = target;
-          }
-
           func(target, event);
         }
       }
@@ -988,6 +996,15 @@ class Objekt {
   }
 
   /**
+   * Stringifies a function
+   * @param {Function} func - The function to stringify
+   * @returns {string} The stringified function
+   */
+  #stringifyFunction(func) {
+    return func.toString();
+  }
+
+  /**
    * Checks if the specified string is a stringified function.
    * @param {string} str - The string to check.
    * @returns {boolean} True if the string is a stringified function, false otherwise.
@@ -1112,8 +1129,8 @@ class Objekt {
     if (element.tagName === "HTML") {
       const script = document.createElement("script");
       script.textContent = `
-        const rootUrl = window.location.origin + "/objekt.js";
-        const Objekt = (await import(rootUrl)).default;
+        const rootUrl = window.location.origin + "/materia.js";
+        const Materia = (await import(rootUrl)).default;
 
         const data = JSON.parse("${this.#stringifyObject(this.#data)}");
           
@@ -1125,7 +1142,7 @@ class Objekt {
           
         const delegate = JSON.parse("${this.#stringifyObject(this.#delegate)}");
           
-        window.objekt = new Objekt({data, endpoints, handlers, delegate});
+        window.materia = new Materia({data, endpoints, handlers, delegate});
       `;
 
       script.setAttribute("type", "module");
@@ -1146,7 +1163,7 @@ class Objekt {
         importMap.type = "importmap";
         importMap.textContent = JSON.stringify({
           imports: {
-            "objekt/elements": "/objekt/elements",
+            "materia/elements": "/materia/elements",
           },
         });
         head.appendChild(importMap);
@@ -1211,4 +1228,4 @@ class Objekt {
   }
 }
 
-export default Objekt;
+export default Materia;

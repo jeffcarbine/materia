@@ -6,8 +6,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Modules
-import Objekt from "objekt";
-const objekt = new Objekt();
+import Materia from "materia";
+const materia = new Materia();
 
 /**
  * Handles an array value in the appData.
@@ -15,7 +15,7 @@ const objekt = new Objekt();
  * @param {Array} value - The array value to handle.
  */
 const handleArray = (key, value) => {
-  objekt.setData(key, value[0], value[1]);
+  materia.setData(key, value[0], value[1]);
 };
 
 /**
@@ -24,7 +24,7 @@ const handleArray = (key, value) => {
  * @param {string} value - The string value to handle.
  */
 const handleString = (key, value) => {
-  objekt.endpoints[key] = value;
+  materia.endpoints[key] = value;
 };
 
 /**
@@ -36,9 +36,9 @@ const handleString = (key, value) => {
 const handleFunction = async (key, func) => {
   const data = await func();
   if (Array.isArray(data)) {
-    objekt.setData(key, data[0], data[1]);
+    materia.setData(key, data[0], data[1]);
   } else {
-    objekt.setData(key, data);
+    materia.setData(key, data);
   }
 };
 
@@ -48,7 +48,7 @@ const handleFunction = async (key, func) => {
  * @param {Object} value - The object value to handle.
  */
 const handleObject = (key, value) => {
-  objekt.setData(key, value);
+  materia.setData(key, value);
 };
 
 /**
@@ -78,7 +78,7 @@ const handleAppData = async (appData) => {
 const viewCache = new Map();
 const registeredRoutes = new Set();
 
-export default async (app, objektName = "objekt") => {
+export default async (app, materiaName = "materia") => {
   app.engine("html.js", (filePath, data, callback) => {
     if (viewCache.has(filePath)) {
       const cachedView = viewCache.get(filePath);
@@ -129,11 +129,11 @@ export default async (app, objektName = "objekt") => {
 
   app.set("view engine", "html.js");
 
-  // make the full objekt file importable client-side via /objekt.js
-  app.get("/objekt.js", (req, res) => {
-    res.sendFile(path.join(__dirname, "objekt.js"));
+  // make the full materia file importable client-side via /materia.js
+  app.get("/materia.js", (req, res) => {
+    res.sendFile(path.join(__dirname, "materia.js"));
   });
-  app.get("/objekt/elements", (req, res) => {
+  app.get("/materia/elements", (req, res) => {
     res.sendFile(path.join(__dirname, "elements.html.js"));
   });
 };
@@ -148,7 +148,7 @@ const renderView = async (view, data, callback) => {
 
         if (endpoint) {
           if (typeof endpoint === "string") {
-            objekt.endpoints[key] = endpoint;
+            materia.endpoints[key] = endpoint;
           } else {
             console.error(
               `Error in endpoints: Expected string for key "${key}", but got ${typeof endpoint}.`
@@ -163,7 +163,7 @@ const renderView = async (view, data, callback) => {
     }
   }
 
-  const html = objekt.render(view.default(data));
+  const html = materia.render(view.default(data));
 
   callback(null, html);
 };

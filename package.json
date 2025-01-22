@@ -1,10 +1,10 @@
 {
-  "name": "objekt",
+  "name": "@jeffcarbine/materia",
   "version": "1.0.2",
   "description": "Server-side and client-side framework for building lightweight websites and apps",
   "type": "module",
   "exports": {
-    ".": "./objekt.js",
+    ".": "./materia.js",
     "./engine": "./engine.js",
     "./elements": "./elements.html.js"
   },
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jeffcarbine/objekt.git"
+    "url": "git+https://github.com/jeffcarbine/materia.git"
   },
   "keywords": [
     "Node.js",
@@ -23,9 +23,9 @@
   "author": "Jeff Carbine",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/jeffcarbine/objekt/issues"
+    "url": "https://github.com/jeffcarbine/materia/issues"
   },
-  "homepage": "https://github.com/jeffcarbine/objekt#readme",
+  "homepage": "https://github.com/jeffcarbine/materia#readme",
   "dependencies": {
     "jsdom": "^26.0.0"
   }
