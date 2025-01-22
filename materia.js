@@ -275,10 +275,10 @@ class Materia {
   #endpoints = {};
 
   /**
-   * Method for checking for an endpoint
+   * Method for setting for an endpoint
    */
-  getEndpoint(binding) {
-    return this.#endpoints[binding];
+  setEndpoint(binding, endpoint) {
+    this.#endpoints[binding] = endpoint;
   }
 
   /**
