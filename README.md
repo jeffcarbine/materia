@@ -41,7 +41,7 @@ Materia is a lightweight JavaScript framework designed for rendering both server
 You can install the package via npm:
 
 ```sh
-npm i materia
+npm i materiajs
 ```
 
 ## Import
