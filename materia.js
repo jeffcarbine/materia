@@ -933,12 +933,22 @@ class Materia {
     // Pull out the pipe for this element to pass along
     const pipe = template.pipe;
 
+    // Pull out the preventDefault value if there is one
+    const preventDefaults = template.preventDefault
+      ? Array.isArray(template.preventDefault)
+        ? template.preventDefault
+        : [template.preventDefault]
+      : [];
+
     // Process each key/value pair in the template
     Object.keys(template).forEach((key) => {
       let value = template[key];
 
       if (this.#eventTypes.includes(key)) {
-        this.#addEventDelegate(element, key, value);
+        // check to see if the default should be prevented
+        const preventDefault = preventDefaults.includes(key);
+
+        this.#addEventDelegate(element, key, value, preventDefault);
       } else {
         if (this.#isStringifiedFunction(value)) {
           value = this.#parseStringifiedFunction(value);
