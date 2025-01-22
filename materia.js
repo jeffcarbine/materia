@@ -1163,7 +1163,7 @@ class Materia {
         importMap.type = "importmap";
         importMap.textContent = JSON.stringify({
           imports: {
-            "materia/elements": "/materia/elements",
+            "@jeffcarbine/materia/elements": "/materia/elements",
           },
         });
         head.appendChild(importMap);
