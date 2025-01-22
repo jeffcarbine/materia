@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Modules
-import Materia from "materia";
+import Materia from "@jeffcarbine/materia";
 const materia = new Materia();
 
 /**
