@@ -148,7 +148,7 @@ const renderView = async (view, data, callback) => {
 
         if (endpoint) {
           if (typeof endpoint === "string") {
-            materia.endpoints[key] = endpoint;
+            materia.getEndpoint(key) = endpoint;
           } else {
             console.error(
               `Error in endpoints: Expected string for key "${key}", but got ${typeof endpoint}.`

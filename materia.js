@@ -275,6 +275,13 @@ class Materia {
   #endpoints = {};
 
   /**
+   * Method for checking for an endpoint
+   */
+  getEndpoint(binding) {
+    return this.#endpoints[binding];
+  }
+
+  /**
    * Sets both the data and the endpoint for the binding.
    * @param {string} bindingId - The ID of the binding.
    * @param {Object} data - The data for the binding.
