@@ -98,7 +98,7 @@ class Materia {
    * @param {string} binding - The binding to set the value for.
    * @param {*} value - The value to set for the binding.
    */
-  set(binding, value) {
+  set(binding, value, lock = false) {
     const keys = binding.split(/[\.\[\]]/).filter(Boolean),
       hook = keys[0];
 
@@ -116,7 +116,7 @@ class Materia {
       check(this.#data, 0);
     }
 
-    this.#handleBindingUpdate(binding);
+    this.#handleBindingUpdate(binding, lock);
   }
 
   /**
@@ -196,7 +196,7 @@ class Materia {
    * Runs the handlers if a binding is updated via set or push
    * @param {string} binding - The binding to update.
    */
-  #handleBindingUpdate(binding) {
+  #handleBindingUpdate(binding, lock = false) {
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const checkHandlers = async (binding) => {
@@ -204,7 +204,7 @@ class Materia {
         for (const handler of this.#handlers[binding]) {
           this.#handle(binding, handler);
 
-          if (!this.#fromServer) {
+          if (!lock) {
             const { hook } = this.#splitBinding(binding);
             const endpoint = this.#endpoints[hook];
             if (endpoint) {
@@ -278,9 +278,7 @@ class Materia {
         .then((data) => {
           if (receiveData) {
             if (JSON.stringify(data) !== JSON.stringify(this.get(binding))) {
-              this.#fromServer = true;
-              this.set(binding, data);
-              this.#fromServer = false;
+              this.set(binding, data, true);
             }
           }
         })
@@ -532,6 +530,37 @@ class Materia {
    */
   importedComponents = {};
 
+  async #plumb(pipe) {
+    for (let key in pipe) {
+      if (typeof pipe[key] === "string" && pipe[key].startsWith("import::")) {
+        const path = pipe[key].replace("import::", "");
+
+        // Check if the component is already imported
+        if (this.importedComponents[path]) {
+          pipe[key] = this.importedComponents[path];
+        } else {
+          try {
+            // Dynamically import the component
+            const module = await import(path);
+
+            // Check for named export or default export
+            const component = module[key] || module.default;
+
+            if (component) {
+              this.importedComponents[path] = component;
+              pipe[key] = component;
+            } else {
+              console.error(`Component ${key} not found in ${path}`);
+            }
+          } catch (error) {
+            console.error(`Error importing ${path}:`, error);
+          }
+        }
+      }
+    }
+    return pipe;
+  }
+
   /**
    * Processes a handler for a binding
    * @param {string} binding - The binding to process the handler for.
@@ -551,33 +580,7 @@ class Materia {
 
     // check to see if any of the pipe values are strings that need to be imported
     if (pipe) {
-      for (let key in pipe) {
-        if (typeof pipe[key] === "string" && pipe[key].startsWith("import::")) {
-          const path = pipe[key].replace("import::", "");
-
-          // Check if the component is already imported
-          if (this.importedComponents[path]) {
-            pipe[key] = this.importedComponents[path];
-          } else {
-            try {
-              // Dynamically import the component
-              const module = await import(path);
-
-              // Check for named export or default export
-              const component = module[key] || module.default;
-
-              if (component) {
-                this.importedComponents[path] = component;
-                pipe[key] = component;
-              } else {
-                console.error(`Component ${key} not found in ${path}`);
-              }
-            } catch (error) {
-              console.error(`Error importing ${path}:`, error);
-            }
-          }
-        }
-      }
+      pipe = await this.#plumb(pipe);
     }
 
     value = func(this.get(binding), elements, pipe);
@@ -642,7 +645,7 @@ class Materia {
    * @param {string} event - The event to add the delegate for
    * @param {Function} func - The function to run when the event is triggered
    */
-  #addEventDelegate(element, event, func) {
+  #addEventDelegate(element, event, func, pipe, preventDefault) {
     // first, we need to check what kind of event is being registered
     // -- if it is a load or resize function that are being set to the
     // window, then they need to be handled differently and just get
@@ -670,7 +673,7 @@ class Materia {
         func = this.#stringifyFunction(func);
       }
 
-      this.#registerEvent(event, target, func, true);
+      this.#registerEvent(event, target, pipe, func, preventDefault);
     }
   }
 
@@ -681,7 +684,7 @@ class Materia {
    * @param {Function} func - The function to run when the event is triggered
    * @param {boolean} preventDefault - Whether to prevent the default behavior of the event
    */
-  #registerEvent(event, target, func, preventDefault) {
+  #registerEvent(event, target, pipe, func, preventDefault) {
     // check to see if the object already has an instance of the event (which, if it does, it means we have already
     // registered an Event Listener for it)
     if (this.#delegate[event] === undefined) {
@@ -692,6 +695,7 @@ class Materia {
     const eventData = {
       target,
       func,
+      pipe,
       preventDefault,
     };
 
@@ -749,8 +753,12 @@ class Materia {
       eventArr = this.#delegate[event.type];
     }
 
-    eventArr.forEach((eventObj) => {
-      let { target, func, preventDefault } = eventObj;
+    eventArr.forEach(async (eventObj) => {
+      let { target, func, pipe, preventDefault } = eventObj;
+
+      if (pipe) {
+        pipe = await this.#plumb(pipe);
+      }
 
       // if the target is a string, then we need to get the element
       // and update the delegate
@@ -791,7 +799,7 @@ class Materia {
 
         // run the function and pass the target
         if (!disabled) {
-          func(event);
+          func(event, pipe);
         }
       }
     });
@@ -991,7 +999,7 @@ class Materia {
         // check to see if the default should be prevented
         const preventDefault = preventDefaults.includes(key);
 
-        this.#addEventDelegate(element, key, value, preventDefault);
+        this.#addEventDelegate(element, key, value, pipe, preventDefault);
       } else {
         if (this.#isStringifiedFunction(value)) {
           value = this.#parseStringifiedFunction(value);

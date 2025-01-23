@@ -35,11 +35,7 @@ const handleString = (key, value) => {
  */
 const handleFunction = async (key, func) => {
   const data = await func();
-  if (Array.isArray(data)) {
-    materia.setData(key, data[0], data[1]);
-  } else {
-    materia.setData(key, data);
-  }
+  materia.setData(key, data);
 };
 
 /**
