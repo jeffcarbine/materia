@@ -7,65 +7,71 @@ const __dirname = path.dirname(__filename);
 
 // Modules
 import Materia from "materiajs";
-const materia = new Materia();
 
 /**
  * Handles an array value in the appData.
+ * @param {Materia} materia - The Materia instance.
  * @param {string} key - The key of the appData entry.
  * @param {Array} value - The array value to handle.
  */
-const handleArray = (key, value) => {
+const handleArray = (materia, key, value) => {
   materia.setData(key, value[0], value[1]);
 };
 
 /**
  * Handles a string value in the appData.
+ * @param {Materia} materia - The Materia instance.
  * @param {string} key - The key of the appData entry.
  * @param {string} value - The string value to handle.
  */
-const handleString = (key, value) => {
+const handleString = (materia, key, value) => {
   materia.endpoints[key] = value;
 };
 
 /**
  * Handles a function value in the appData.
+ * @param {Materia} materia - The Materia instance.
  * @param {string} key - The key of the appData entry.
  * @param {Function} func - The function to handle.
  * @returns {Promise<void>}
  */
-const handleFunction = async (key, func) => {
+const handleFunction = async (materia, key, func) => {
   const data = await func();
   materia.setData(key, data);
 };
 
 /**
  * Handles an object value in the appData.
+ * @param {Materia} materia - The Materia instance.
  * @param {string} key - The key of the appData entry.
  * @param {Object} value - The object value to handle.
  */
-const handleObject = (key, value) => {
+const handleObject = (materia, key, value) => {
   materia.setData(key, value);
 };
 
 /**
  * Handles the appData by iterating over its entries and calling the appropriate handler function.
+ * @param {Materia} materia - The Materia instance.
  * @param {Object} appData - The appData object to handle.
  * @returns {Promise<void>}
  */
-const handleAppData = async (appData) => {
+const handleAppData = async (materia, appData) => {
   for (const key in appData) {
     if (appData.hasOwnProperty(key)) {
       const value = appData[key];
       if (Array.isArray(value)) {
-        handleArray(key, value);
+        handleArray(materia, key, value);
       } else if (typeof value === "string") {
-        handleString(key, value);
+        handleString(materia, key, value);
       } else if (typeof value === "function") {
-        await handleFunction(key, value);
+        await handleFunction(materia, key, value);
       } else if (typeof value === "object") {
-        handleObject(key, value);
+        handleObject(materia, key, value);
       } else {
-        console.error(`${key} must be a string, function, or object.`);
+        console.error(
+          `${key} must be a string, function, or object, but got ${typeof value}.`
+        );
       }
     }
   }
@@ -135,12 +141,14 @@ export default async (app, materiaName = "materia") => {
 };
 
 const renderView = async (view, data, callback) => {
+  const materia = new Materia();
+
   if (typeof view.config === "function") {
     const config = view.config(data);
     if (config && typeof config === "object") {
       for (const key in config) {
         const { appData, endpoint } = config[key];
-        await handleAppData({ [key]: appData });
+        await handleAppData(materia, { [key]: appData });
 
         if (endpoint) {
           if (typeof endpoint === "string") {
