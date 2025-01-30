@@ -133,25 +133,18 @@ class Materia {
       return;
     }
 
-    let isPushed = false;
+    const target = this.get(binding);
 
-    const check = (target, index) => {
-      if (index === keys.length - 1) {
-        if (Array.isArray(target[keys[index]])) {
-          target[keys[index]].push(value);
-          isPushed = true;
-        } else {
-          console.error(`Error: ${binding} is not an array.`);
-        }
-      } else {
-        check(target[keys[index]], index + 1);
-      }
-    };
+    if (!target) {
+      console.error(`Error: ${binding} is not defined.`);
+      return;
+    }
 
-    check(this.#data, 0);
-
-    if (isPushed) {
+    if (Array.isArray(target)) {
+      target.push(value);
       this.#handleBindingUpdate(binding);
+    } else {
+      console.error(`Error: ${binding} is not an array.`);
     }
   }
 
@@ -190,6 +183,42 @@ class Materia {
 
     const updatedIndex = arrayIndex > -1 ? arrayIndex : target.length - 1;
     this.#handleBindingUpdate(`${binding}[${updatedIndex}]`);
+  }
+
+  /**
+   * Removes a matching value from an array.
+   */
+  splice(binding, query) {
+    // Get the value from the binding
+    const target = this.get(binding);
+
+    if (!target) {
+      console.error(`Error: ${binding} is not defined.`);
+      return;
+    }
+
+    if (!Array.isArray(target)) {
+      console.error(`Error: ${binding} is not an array.`);
+      return;
+    }
+
+    // Define the queryFunction
+    const queryFunction = (query) => {
+      return (element) => {
+        return Object.keys(query).every((key) => element[key] === query[key]);
+      };
+    };
+
+    const arrayIndex = target.findIndex(queryFunction(query));
+
+    if (arrayIndex > -1) {
+      target.splice(arrayIndex, 1);
+      this.#handleBindingUpdate(binding);
+    } else {
+      console.warn(
+        `Warning: No matching element found in ${binding} for removal.`
+      );
+    }
   }
 
   /**
@@ -372,6 +401,7 @@ class Materia {
       "innerHTML",
       "if",
       "style",
+      "binding",
     ];
 
     if (!nonAttributes.includes(key)) {
@@ -399,12 +429,24 @@ class Materia {
    * @returns {void}
    */
   #setAttribute(element, key, value) {
-    element.removeAttribute(key);
-    const hasUpperCase = /[A-Z]/.test(key);
-    if (hasUpperCase) {
-      element.setAttributeNS(null, key, value);
+    const booleanAttributes = [
+      "required",
+      "checked",
+      "disabled",
+      "readonly",
+      "selected",
+    ];
+
+    if (booleanAttributes.includes(key) && value === false) {
+      element.removeAttribute(key);
     } else {
-      element.setAttribute(key, value);
+      element.removeAttribute(key);
+      const hasUpperCase = /[A-Z]/.test(key);
+      if (hasUpperCase) {
+        element.setAttributeNS(null, key, value);
+      } else {
+        element.setAttribute(key, value);
+      }
     }
   }
 
@@ -637,6 +679,11 @@ class Materia {
     "message",
     "open",
     "close",
+
+    // mutations
+    "childList",
+    "subtree",
+    "characterData",
   ];
 
   /**
@@ -650,31 +697,23 @@ class Materia {
     // -- if it is a load or resize function that are being set to the
     // window, then they need to be handled differently and just get
     // pushed to their corresponding arrays
-    if (event.indexOf("load") > -1 && element === window) {
-      onloadFunctions.push(func);
-    } else if (event.indexOf("resize") > -1 && element === window) {
-      onresizeFunctions.push(func);
-    } else if (event.indexOf("scroll") > -1 && element === window) {
-      scrollFunctions.push(func);
-    } else {
-      let target = element;
+    let target = element;
 
-      if (isServer) {
-        // create a unique id for the element
-        const delegateId = this.#generateUniqueId();
+    if (isServer) {
+      // create a unique id for the element
+      const delegateId = this.#generateUniqueId();
 
-        // set the delegate id on the element
-        element.dataset.delegateId = delegateId;
+      // set the delegate id on the element
+      element.dataset.delegateId = delegateId;
 
-        target = delegateId;
-      }
-
-      if (isServer) {
-        func = this.#stringifyFunction(func);
-      }
-
-      this.#registerEvent(event, target, pipe, func, preventDefault);
+      target = delegateId;
     }
+
+    if (isServer) {
+      func = this.#stringifyFunction(func);
+    }
+
+    this.#registerEvent(event, target, pipe, func, preventDefault);
   }
 
   /**
@@ -707,28 +746,20 @@ class Materia {
   }
 
   /**
-   * Checks to see if an element is a descendant of another element
-   * @param {Element} parent - The parent element
-   * @param {Element} child - The child element
+   * Checks the lineage of an element to try to find a match to a delegate
+   * @param {Event} event - The event to check
+   * @param {Element} element - The element to check
+   * @returns {Element|false} - The matching element or false
    */
-  #isDescendant(parent, child) {
-    let node = child;
+  #getMatchingTarget(event, element) {
+    let node = event.target;
     while (node !== null) {
-      if (node === parent) {
-        return true;
+      if (node === element) {
+        return element;
       }
       node = node.parentNode;
     }
     return false;
-  }
-
-  /**
-   * Checks to see if an event matches the element
-   * @param {Event} event - The event to check
-   * @param {Element} element - The element to check
-   */
-  #eventMatches(event, element) {
-    return this.#isDescendant(element, event.target);
   }
 
   /**
@@ -775,12 +806,12 @@ class Materia {
 
       // check whether the element or it's direct parent match
       // the key
-      let match = this.#eventMatches(event, target);
+      let match = this.#getMatchingTarget(event, target);
 
       // set the disabled bool
       let disabled = false;
 
-      // if the #eventMatches returned a node
+      // if the #getMatchingTarget returned a node
       if (match !== false) {
         // stop events if the element is disabled
         if (match.disabled === true) {
@@ -788,21 +819,49 @@ class Materia {
         }
 
         // prevent clicks by default unless preventDefault is false
-        if (event.type === "click") {
-          if (preventDefault !== false) {
-            event.preventDefault();
-          }
-          // and for everything else, prevent default if preventDefault is true
-        } else if (preventDefault) {
-          event.preventDefault();
-        }
+        // if (event.type === "click") {
+        //   if (preventDefault !== false) {
+        //     event.preventDefault();
+        //   }
+        //   // and for everything else, prevent default if preventDefault is true
+        // } else if (preventDefault) {
+        //   event.preventDefault();
+        // }
 
         // run the function and pass the target
         if (!disabled) {
-          func(event, pipe);
+          func(match, pipe, event);
         }
       }
     });
+  }
+
+  loadHandler() {
+    // this runs on page load, so we need to pull all the load delegates
+    // and handle them
+    let loadDelegates = this.#delegate.load;
+
+    if (loadDelegates !== undefined) {
+      loadDelegates.forEach(async (delegate) => {
+        let { target, func, pipe } = delegate;
+
+        if (pipe) {
+          pipe = await this.#plumb(pipe);
+        }
+
+        if (typeof target === "string") {
+          target = document.querySelector("[data-delegate-id=" + target + "]");
+          delegate.target = target;
+        }
+
+        if (typeof func === "string") {
+          func = this.#parseStringifiedFunction(func);
+          delegate.func = func;
+        }
+
+        func(target, pipe);
+      });
+    }
   }
 
   /**
@@ -832,7 +891,12 @@ class Materia {
    * @param {string} event - The event to check
    */
   #isValidMutation(event) {
-    if (event === "childList" || event.includes("attributes")) {
+    if (
+      event === "childList" ||
+      event.includes("attributes") ||
+      event === "characterData" ||
+      event === "subtree"
+    ) {
       return true;
     } else {
       return false;
@@ -876,8 +940,11 @@ class Materia {
     // Select the node that will be observed for mutations
     const targetNode = document.querySelector("body");
 
-    // Create an observer instance linked to the callback function
-    this.#observer = new MutationObserver(this.#mutationCallback);
+    // Bind the mutation callback to the correct context
+    const boundMutationCallback = this.#mutationCallback.bind(this);
+
+    // Create an observer instance linked to the bound callback function
+    this.#observer = new MutationObserver(boundMutationCallback);
 
     // Start observing the target node for configured mutations
     this.#observer.observe(targetNode, this.#mutationConfig);
@@ -894,38 +961,34 @@ class Materia {
     let attributeName = type === "attributes" ? mutation.attributeName : false;
 
     let funcs = attributeName
-      ? delegate[type + ":" + attributeName]
-      : delegate[type];
+      ? this.#delegate[type + ":" + attributeName]
+      : this.#delegate[type];
 
     if (funcs !== undefined) {
-      funcs.forEach((funcObj) => {
-        const func = funcObj.func,
-          target = funcObj.target,
-          nodes =
-            mutationTarget.nodeType === 1
-              ? mutationTarget.querySelectorAll(target)
-              : [];
+      funcs.forEach(async (funcObj) => {
+        let { func, target, pipe } = funcObj;
 
-        var isMutation = false;
-        var existsInMutation = false;
+        if (pipe) {
+          pipe = await this.#plumb(pipe);
+        }
+
+        // if the target is a string, then we need to get the element
+        if (typeof target === "string") {
+          target = document.querySelector(`[data-delegate-id="${target}"]`);
+          funcObj.target = target;
+        }
+
+        // if the function is a stringified function, we need to parse it
+        if (typeof func === "string") {
+          func = this.#parseStringifiedFunction(func);
+          funcObj.func = func;
+        }
 
         // check to see if the element itself is the
         // mutation or if the element exists as a child
         // of the mutation
-        if (mutationTarget.nodeType === 1 && mutationTarget.matches(target)) {
-          isMutation = true;
-        }
-
-        if (!isMutation) {
-          existsInMutation = nodes.length > 0 ? true : false;
-        }
-
-        if (isMutation) {
-          func(mutationTarget, mutation);
-        } else if (existsInMutation) {
-          nodes.forEach(function (node) {
-            func(node, mutation);
-          });
+        if (mutationTarget.nodeType === 1 && mutationTarget === target) {
+          func(mutationTarget, mutation, pipe);
         }
       });
     }
@@ -995,7 +1058,7 @@ class Materia {
     Object.keys(template).forEach((key) => {
       let value = template[key];
 
-      if (this.#eventTypes.includes(key)) {
+      if (this.#eventTypes.includes(key) || key.startsWith("attributes:")) {
         // check to see if the default should be prevented
         const preventDefault = preventDefaults.includes(key);
 
@@ -1007,12 +1070,13 @@ class Materia {
 
         let binding = template.binding;
 
-        if (typeof value === "function") {
+        // If the value is a function and the key isn't an event, it's a binding
+        if (typeof value === "function" && !this.#eventTypes.includes(key)) {
           // if the binding is undefined, we need to alert the user and continue the render
           if (!binding) {
-            console.error(
-              `No binding found for function value: ${value.toString()}`
-            );
+            // console.error(
+            //   `No binding found for function value: ${value.toString()}`
+            // );
           } else {
             this.#processFunctionValue(
               element,
@@ -1211,6 +1275,8 @@ class Materia {
         const delegate = JSON.parse("${this.#stringifyObject(this.#delegate)}");
           
         window.materia = new Materia({data, endpoints, handlers, delegate});
+
+        materia.loadHandler();
       `;
 
       script.setAttribute("type", "module");

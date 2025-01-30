@@ -37,6 +37,7 @@ const handleString = (materia, key, value) => {
  */
 const handleFunction = async (materia, key, func) => {
   const data = await func();
+
   materia.setData(key, data);
 };
 

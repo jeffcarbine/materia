@@ -470,6 +470,11 @@ const validAttributes = [
   "open",
   "close",
 
+  // mutation types
+  "childList",
+  "characterData",
+  "subtree",
+
   // materia specific attributes
   "if",
   "child",
@@ -479,6 +484,7 @@ const validAttributes = [
   "binding",
   "components",
   "pipe",
+  "preventDefault",
 ];
 
 export class Element {
@@ -533,7 +539,11 @@ export class Element {
         this.child = params;
       } else {
         for (let key in params) {
-          if (validAttributes.includes(key) || key.startsWith("data-")) {
+          if (
+            validAttributes.includes(key) ||
+            key.startsWith("data-") ||
+            key.startsWith("attributes:")
+          ) {
             this[key] = params[key];
           }
         }
@@ -1450,20 +1460,20 @@ export class Input extends Element {
   constructor(params) {
     super(params);
 
-    if (params.label) {
-      // Set the tagName to "label" and create a child Input element
-      this.tagName = "label";
-      this.initialize(params.label);
+    // if (params.label) {
+    //   // Set the tagName to "label" and create a child Input element
+    //   this.tagName = "label";
+    //   this.initialize(params.label);
 
-      const paramsNoLabel = { ...params };
-      delete paramsNoLabel.label;
+    //   const paramsNoLabel = { ...params };
+    //   delete paramsNoLabel.label;
 
-      this.child = new Input({ ...paramsNoLabel });
-    } else {
-      // Set the tagName to "input"
-      this.tagName = "input";
-      this.initialize(params);
-    }
+    //   this.child = new Input({ ...paramsNoLabel });
+    // } else {
+    // Set the tagName to "input"
+    this.tagName = "input";
+    this.initialize(params);
+    //}
   }
 }
 
