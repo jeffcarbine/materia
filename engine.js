@@ -6,82 +6,41 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Modules
-import Materia from "materiajs";
+import MateriaJS from "materiajs";
 
 /**
- * Handles an array value in the appData.
- * @param {Materia} materia - The Materia instance.
- * @param {string} key - The key of the appData entry.
- * @param {Array} value - The array value to handle.
- */
-const handleArray = (materia, key, value) => {
-  materia.setData(key, value[0], value[1]);
-};
-
-/**
- * Handles a string value in the appData.
- * @param {Materia} materia - The Materia instance.
- * @param {string} key - The key of the appData entry.
- * @param {string} value - The string value to handle.
- */
-const handleString = (materia, key, value) => {
-  materia.endpoints[key] = value;
-};
-
-/**
- * Handles a function value in the appData.
- * @param {Materia} materia - The Materia instance.
- * @param {string} key - The key of the appData entry.
+ * Handles a function value in the data.
+ * @param {MateriaJS} Materia - The Materia instance.
+ * @param {string} key - The key of the data entry.
  * @param {Function} func - The function to handle.
  * @returns {Promise<void>}
  */
-const handleFunction = async (materia, key, func) => {
+const handleFunction = async (Materia, key, func) => {
   const data = await func();
 
-  materia.setData(key, data);
+  Materia.set(key, data);
 };
 
 /**
- * Handles an object value in the appData.
- * @param {Materia} materia - The Materia instance.
- * @param {string} key - The key of the appData entry.
- * @param {Object} value - The object value to handle.
- */
-const handleObject = (materia, key, value) => {
-  materia.setData(key, value);
-};
-
-/**
- * Handles the appData by iterating over its entries and calling the appropriate handler function.
- * @param {Materia} materia - The Materia instance.
- * @param {Object} appData - The appData object to handle.
+ * Handles the data by iterating over its entries and calling the appropriate handler function.
+ * @param {MateriaJS} Materia - The Materia instance.
+ * @param {Object} data - The data object to handle.
  * @returns {Promise<void>}
  */
-const handleAppData = async (materia, appData) => {
-  for (const key in appData) {
-    if (appData.hasOwnProperty(key)) {
-      const value = appData[key];
-      if (Array.isArray(value)) {
-        handleArray(materia, key, value);
-      } else if (typeof value === "string") {
-        handleString(materia, key, value);
-      } else if (typeof value === "function") {
-        await handleFunction(materia, key, value);
-      } else if (typeof value === "object") {
-        handleObject(materia, key, value);
-      } else {
-        console.error(
-          `${key} must be a string, function, or object, but got ${typeof value}.`
-        );
-      }
-    }
+const handledata = async (Materia, key, data) => {
+  const value = data;
+
+  if (typeof value === "function") {
+    await handleFunction(Materia, key, value);
+  } else {
+    Materia.set(key, value);
   }
 };
 
 const viewCache = new Map();
 const registeredRoutes = new Set();
 
-export default async (app, materiaName = "materia") => {
+export default async (app) => {
   app.engine("html.js", (filePath, data, callback) => {
     if (viewCache.has(filePath)) {
       const cachedView = viewCache.get(filePath);
@@ -91,35 +50,35 @@ export default async (app, materiaName = "materia") => {
         .then(async (view) => {
           viewCache.set(filePath, view);
 
-          if (typeof view.config === "function") {
-            // Register routes only once per view
-            const config = view.config(data);
+          // if (typeof view.config === "function") {
+          //   // Register routes only once per view
+          //   const config = view.config(data);
 
-            if (config && typeof config === "object") {
-              for (const key in config) {
-                const { route } = config[key];
+          //   if (config && typeof config === "object") {
+          //     for (const key in config) {
+          //       const { route } = config[key];
 
-                if (route) {
-                  if (typeof route === "function") {
-                    if (!registeredRoutes.has(key)) {
-                      route(app);
-                      registeredRoutes.add(key);
-                    } else {
-                      console.error(`Route for ${key} already registered.`);
-                    }
-                  } else {
-                    console.error(
-                      `Error in routes: Expected function for key "${key}", but got ${typeof route}.`
-                    );
-                  }
-                }
-              }
-            } else {
-              console.error(
-                `Error in config: Expected an object, but got ${typeof config}.`
-              );
-            }
-          }
+          //       if (route) {
+          //         if (typeof route === "function") {
+          //           if (!registeredRoutes.has(key)) {
+          //             route(app);
+          //             registeredRoutes.add(key);
+          //           } else {
+          //             console.error(`Route for ${key} already registered.`);
+          //           }
+          //         } else {
+          //           console.error(
+          //             `Error in routes: Expected function for key "${key}", but got ${typeof route}.`
+          //           );
+          //         }
+          //       }
+          //     }
+          //   } else {
+          //     console.error(
+          //       `Error in config: Expected an object, but got ${typeof config}.`
+          //     );
+          //   }
+          // }
 
           renderView(view, data, callback);
         })
@@ -132,7 +91,7 @@ export default async (app, materiaName = "materia") => {
 
   app.set("view engine", "html.js");
 
-  // make the full materia file importable client-side via /materia.js
+  // make the full materiajs file importable client-side via /materia.js
   app.get("/materia.js", (req, res) => {
     res.sendFile(path.join(__dirname, "materia.js"));
   });
@@ -141,34 +100,37 @@ export default async (app, materiaName = "materia") => {
   });
 };
 
-const renderView = async (view, data, callback) => {
-  const materia = new Materia();
+const renderView = async (view, _data, callback) => {
+  const Materia = new MateriaJS();
 
-  if (typeof view.config === "function") {
-    const config = view.config(data);
-    if (config && typeof config === "object") {
-      for (const key in config) {
-        const { appData, endpoint } = config[key];
-        await handleAppData(materia, { [key]: appData });
+  const config = view.data;
 
-        if (endpoint) {
-          if (typeof endpoint === "string") {
-            materia.setEndpoint(key, endpoint);
-          } else {
-            console.error(
-              `Error in endpoints: Expected string for key "${key}", but got ${typeof endpoint}.`
-            );
-          }
-        }
-      }
-    } else {
-      console.error(
-        `Error in appData: Expected an object, but got ${typeof config}.`
-      );
+  if (config && typeof config === "object") {
+    for (const key in config) {
+      const data =
+        typeof config[key] === "function"
+          ? await config[key](_data)
+          : config[key];
+
+      await handledata(Materia, key, data);
+
+      // if (endpoint) {
+      //   if (typeof endpoint === "string") {
+      //     Materia.setEndpoint(key, endpoint);
+      //   } else {
+      //     console.error(
+      //       `Error in endpoints: Expected string for key "${key}", but got ${typeof endpoint}.`
+      //     );
+      //   }
+      // }
     }
+  } else {
+    console.error(
+      `Error in data: Expected an object, but got ${typeof config}.`
+    );
   }
 
-  const html = materia.render(view.default(data));
+  const html = Materia.render(view.default(_data));
 
   callback(null, html);
 };

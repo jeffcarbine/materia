@@ -28,24 +28,22 @@ export function Bind(callback) {
 }
 
 /**
- * The main Materia class.
+ * The main MateriaJS class.
  * @class Materia
  * @param {Object} params - The parameters for the Materia class when initializing.
  * @param {Object} params.data - The data object for the data bindings.
- * @param {Object} params.endpoints - The endpoints for updating the data.
  * @param {Object} params.handlers - The handlers object for the template engine.
  * @param {Object} params.delegate - The delegate object for the event delegation.
  * @returns {Materia} The Materia class.
  */
-class Materia {
+class MateriaJS {
   constructor(params) {
     if (!isServer) {
-      // Get the data, endpoints, and handlers from the params
-      const { data, endpoints, handlers, delegate } = params;
+      // Get the data and handlers from the params
+      const { data, handlers, delegate } = params;
 
-      // Set the data, endpoints, and handlers
+      // Set the data and handlers
       this.#data = data;
-      this.#endpoints = endpoints;
       this.#handlers = handlers;
       this.#delegate = delegate;
 
@@ -59,21 +57,46 @@ class Materia {
   #handlers = {};
 
   /**
-   * Whether we are processing data from the server at the moment.
-   */
-  #fromServer = false;
-
-  /**
    * Gets the value from a binding string
    * @param {string} binding - The binding to get the value for.
    * @returns {*} The bindingValue of the specified binding.
    */
-  get(binding) {
+  get(binding, type) {
+    let defaultType;
+
+    switch (type) {
+      case "array":
+        defaultType = [];
+        break;
+      case "object":
+        defaultType = {};
+        break;
+      case "string":
+        defaultType = "";
+        break;
+      default:
+        defaultType = null;
+    }
+
     const value = binding.split(".").reduce((acc, part) => {
+      if (acc === null || acc === undefined) {
+        this.set(binding, defaultType);
+        return this.get[binding];
+      }
+
       const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
       if (arrayMatch) {
         const [, key, index] = arrayMatch;
+        if (!acc[key] || acc[key][index] === undefined) {
+          this.set(binding, defaultType);
+          return this.get[binding];
+        }
         return acc[key][index];
+      }
+
+      if (acc[part] === undefined) {
+        this.set(binding, defaultType);
+        return this.get[binding];
       }
       return acc[part];
     }, this.#data);
@@ -82,41 +105,85 @@ class Materia {
   }
 
   /**
-   * Splits a binding into a hook and tether.
-   * @param {string} binding - The binding to split.
-   * @returns {Object} The hook and tether of the binding.
-   */
-  #splitBinding(binding) {
-    const parts = binding.split(".");
-    const hook = parts.shift();
-    const tether = parts.join(".");
-    return { hook, tether };
-  }
-
-  /**
    * Sets the value for a binding.
    * @param {string} binding - The binding to set the value for.
    * @param {*} value - The value to set for the binding.
    */
-  set(binding, value, lock = false) {
-    const keys = binding.split(/[\.\[\]]/).filter(Boolean),
-      hook = keys[0];
+  set(binding, value) {
+    const keys = binding.split(/[\.\[\]]/).filter(Boolean);
+    let target = this.#data;
 
-    if (!this.#data[hook]) {
-      this.#data[hook] = value;
-    } else {
-      const check = (target, index) => {
-        if (index === keys.length - 1) {
-          target[keys[index]] = value;
-        } else {
-          check(target[keys[index]], index + 1);
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      const arrayMatch = key.match(/(\w+)\[(\d+)\]/);
+
+      if (arrayMatch) {
+        const [, arrayKey, arrayIndex] = arrayMatch;
+
+        if (!target[arrayKey]) {
+          target[arrayKey] = [];
         }
-      };
 
-      check(this.#data, 0);
+        if (!Array.isArray(target[arrayKey])) {
+          console.error(`Error: ${arrayKey} is not an array.`);
+          return;
+        }
+
+        if (i === keys.length - 1) {
+          target[arrayKey][arrayIndex] = value;
+        } else {
+          if (!target[arrayKey][arrayIndex]) {
+            target[arrayKey][arrayIndex] = {};
+          }
+          target = target[arrayKey][arrayIndex];
+        }
+      } else {
+        if (i === keys.length - 1) {
+          target[key] = value;
+        } else {
+          if (!target[key]) {
+            target[key] = {};
+          } else if (typeof target[key] !== "object") {
+            console.error(
+              `Error: Cannot set property on non-object value at ${key}`
+            );
+            return;
+          }
+          target = target[key];
+        }
+      }
     }
 
-    this.#handleBindingUpdate(binding, lock);
+    this.#handleBindingUpdate(binding);
+  }
+
+  /**
+   * Updates multiple bindings based on an object structure
+   * @param {string} binding - The root binding to update
+   * @param {Object} data - The data object containing updates
+   */
+  update(binding, data) {
+    const updateRecursive = (currentBinding, currentData) => {
+      if (typeof currentData !== "object" || currentData === null) {
+        this.set(currentBinding, currentData);
+        return;
+      }
+
+      for (const key in currentData) {
+        const newBinding = currentBinding ? `${currentBinding}.${key}` : key;
+        const value = currentData[key];
+
+        if (Array.isArray(value)) {
+          this.set(newBinding, value);
+        } else if (typeof value === "object" && value !== null) {
+          updateRecursive(newBinding, value);
+        } else {
+          this.set(newBinding, value);
+        }
+      }
+    };
+
+    updateRecursive(binding, data);
   }
 
   /**
@@ -128,14 +195,21 @@ class Materia {
     const keys = binding.split(/[\.\[\]]/).filter(Boolean),
       hook = keys[0];
 
-    if (!this.#data[hook]) {
+    if (this.#data[hook] === undefined) {
       console.error(`Error: ${hook} is not defined.`);
       return;
     }
 
-    const target = this.get(binding);
+    let target = this.get(binding, "array");
+
+    if (target === null) {
+      target = [];
+      // then we need to replace the null value with an empty array
+      this.set(binding, target);
+    }
 
     if (!target) {
+      console.log(this.get(binding));
       console.error(`Error: ${binding} is not defined.`);
       return;
     }
@@ -154,7 +228,7 @@ class Materia {
    */
   setInArray(binding, query, value) {
     // Get the value from the binding
-    const target = this.get(binding);
+    const target = this.get(bindin, "array");
 
     if (!target) {
       console.error(`Error: ${binding} is not defined.`);
@@ -188,9 +262,9 @@ class Materia {
   /**
    * Removes a matching value from an array.
    */
-  splice(binding, query) {
+  pull(binding, query) {
     // Get the value from the binding
-    const target = this.get(binding);
+    const target = this.get(binding, "array");
 
     if (!target) {
       console.error(`Error: ${binding} is not defined.`);
@@ -225,24 +299,11 @@ class Materia {
    * Runs the handlers if a binding is updated via set or push
    * @param {string} binding - The binding to update.
    */
-  #handleBindingUpdate(binding, lock = false) {
-    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
+  #handleBindingUpdate(binding) {
     const checkHandlers = async (binding) => {
       if (this.#handlers[binding]) {
         for (const handler of this.#handlers[binding]) {
           this.#handle(binding, handler);
-
-          if (!lock) {
-            const { hook } = this.#splitBinding(binding);
-            const endpoint = this.#endpoints[hook];
-            if (endpoint) {
-              this.#syncWithServer(binding);
-            }
-          }
-
-          // Add a delay of 5 seconds between each handler
-          await delay(0);
         }
       } else {
         const parentBinding = binding.replace(/(\.[^\.]*|\[\d+\])$/, "");
@@ -258,110 +319,20 @@ class Materia {
   }
 
   /**
-   * The timeouts for synchronizing the data with the server.
-   * Debounces the requests to the server.
-   */
-  syncTimeouts = {};
-
-  /**
-   * Synchronizes the data with the server for the given hook.
-   * @param {string} binding - The binding to synchronize.
-   * @param {Object} options - Optional parameters for the request.
-   * @param {string} [options.method="POST"] - The HTTP method to use for the request.
-   * @param {boolean} [options.sendData=true] - Whether to send data to the server.
-   * @param {boolean} [options.receiveData=true] - Whether to receive data from the server.
-   */
-  #syncWithServer(binding, options = {}) {
-    const { method = "POST", sendData = true, receiveData = true } = options;
-    const { hook } = this.#splitBinding(binding);
-    const endpoint = this.#endpoints[hook];
-
-    if (!this.#data[hook]) {
-      this.#data[hook] = {}; // Initialize the data for the hook if it doesn't exist
-    }
-
-    // Clear any existing timeout for this binding
-    if (this.syncTimeouts[binding]) {
-      clearTimeout(this.syncTimeouts[binding]);
-    }
-
-    // Set a new timeout for this binding
-    this.syncTimeouts[binding] = setTimeout(() => {
-      const dataToSend = sendData ? JSON.stringify(this.get(binding)) : null;
-
-      fetch(endpoint, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: dataToSend,
-      })
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(
-              `Failed to synchronize data: ${response.statusText}`
-            );
-          }
-          return receiveData ? response.json() : null;
-        })
-        .then((data) => {
-          if (receiveData) {
-            if (JSON.stringify(data) !== JSON.stringify(this.get(binding))) {
-              this.set(binding, data, true);
-            }
-          }
-        })
-        .catch((error) => {
-          console.error(error);
-        });
-
-      // Clear the timeout after the request is sent
-      delete this.syncTimeouts[binding];
-    }, 300); // Adjust the debounce delay as needed (300ms in this example)
-  }
-
-  /**
    * The data object for the data bindings.
    */
   #data = {};
 
   /**
    * Lets you check to see what the data is currently at
-   * @returns {Object} The review object, which contains the data, handlers, endpoints and delegate.
+   * @returns {Object} The review object, which contains the data, handlers and delegate.
    */
   review() {
     return {
       data: this.#data,
       handlers: this.#handlers,
-      endpoints: this.#endpoints,
       delegate: this.#delegate,
     };
-  }
-
-  /**
-   * Stores the endpoints for updating the data.
-   */
-  #endpoints = {};
-
-  /**
-   * Method for setting for an endpoint
-   */
-  setEndpoint(binding, endpoint) {
-    this.#endpoints[binding] = endpoint;
-  }
-
-  /**
-   * Sets both the data and the endpoint for the binding.
-   * @param {string} bindingId - The ID of the binding.
-   * @param {Object} data - The data for the binding.
-   * @param {string} endpoint - The POST endpoint for the binding.
-   */
-  setData(bindingId, data, endpoint) {
-    this.set(bindingId, data);
-
-    if (endpoint) {
-      this.#endpoints[bindingId] = endpoint;
-    }
   }
 
   /**
@@ -572,31 +543,48 @@ class Materia {
    */
   importedComponents = {};
 
+  /**
+   * Ensures that any piped functions are stringified properly
+   */
+  #encodePipe(pipe) {
+    for (let key in pipe) {
+      if (typeof pipe[key] === "function") {
+        pipe[key] = this.#stringifyFunction(pipe[key]);
+      }
+    }
+    return pipe;
+  }
+
   async #plumb(pipe) {
     for (let key in pipe) {
-      if (typeof pipe[key] === "string" && pipe[key].startsWith("import::")) {
-        const path = pipe[key].replace("import::", "");
+      if (typeof pipe[key] === "string") {
+        if (pipe[key].startsWith("import::")) {
+          const path = pipe[key].replace("import::", "");
 
-        // Check if the component is already imported
-        if (this.importedComponents[path]) {
-          pipe[key] = this.importedComponents[path];
-        } else {
-          try {
-            // Dynamically import the component
-            const module = await import(path);
+          // Check if the component is already imported
+          if (this.importedComponents[path]) {
+            pipe[key] = this.importedComponents[path];
+          } else {
+            try {
+              // Dynamically import the component
+              const module = await import(path);
 
-            // Check for named export or default export
-            const component = module[key] || module.default;
+              // Check for named export or default export
+              const component = module[key] || module.default;
 
-            if (component) {
-              this.importedComponents[path] = component;
-              pipe[key] = component;
-            } else {
-              console.error(`Component ${key} not found in ${path}`);
+              if (component) {
+                this.importedComponents[path] = component;
+                pipe[key] = component;
+              } else {
+                console.error(`Component ${key} not found in ${path}`);
+              }
+            } catch (error) {
+              console.error(`Error importing ${path}:`, error);
             }
-          } catch (error) {
-            console.error(`Error importing ${path}:`, error);
           }
+        } else if (this.#isStringifiedFunction(pipe[key])) {
+          const func = this.#parseStringifiedFunction(pipe[key]);
+          pipe[key] = func;
         }
       }
     }
@@ -1045,7 +1033,7 @@ class Materia {
     );
 
     // Pull out the pipe for this element to pass along
-    const pipe = template.pipe;
+    const pipe = this.#encodePipe(template.pipe);
 
     // Pull out the preventDefault value if there is one
     const preventDefaults = template.preventDefault
@@ -1262,21 +1250,17 @@ class Materia {
       const script = document.createElement("script");
       script.textContent = `
         const rootUrl = window.location.origin + "/materia.js";
-        const Materia = (await import(rootUrl)).default;
+        const MateriaJS = (await import(rootUrl)).default;
 
         const data = JSON.parse("${this.#stringifyObject(this.#data)}");
-          
-        const endpoints = JSON.parse("${this.#stringifyObject(
-          this.#endpoints
-        )}");
           
         const handlers = JSON.parse("${this.#stringifyObject(this.#handlers)}");
           
         const delegate = JSON.parse("${this.#stringifyObject(this.#delegate)}");
           
-        window.materia = new Materia({data, endpoints, handlers, delegate});
+        window.Materia = new MateriaJS({data, handlers, delegate});
 
-        materia.loadHandler();
+        Materia.loadHandler();
       `;
 
       script.setAttribute("type", "module");
@@ -1362,4 +1346,4 @@ class Materia {
   }
 }
 
-export default Materia;
+export default MateriaJS;
