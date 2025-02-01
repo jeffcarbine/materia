@@ -61,45 +61,32 @@ class MateriaJS {
    * @param {string} binding - The binding to get the value for.
    * @returns {*} The bindingValue of the specified binding.
    */
-  get(binding, type) {
-    let defaultType;
+  get(binding) {
+    // every value defaults to an empty string unless it is set
+    let defaultType = "";
 
-    switch (type) {
-      case "array":
-        defaultType = [];
-        break;
-      case "object":
-        defaultType = {};
-        break;
-      case "string":
-        defaultType = "";
-        break;
-      default:
-        defaultType = null;
-    }
-
-    const value = binding.split(".").reduce((acc, part) => {
-      if (acc === null || acc === undefined) {
-        this.set(binding, defaultType);
-        return this.get[binding];
-      }
-
-      const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
-      if (arrayMatch) {
-        const [, key, index] = arrayMatch;
-        if (!acc[key] || acc[key][index] === undefined) {
-          this.set(binding, defaultType);
-          return this.get[binding];
+    const value = binding
+      .split(/[\.\[\]]/)
+      .filter(Boolean)
+      .reduce((acc, part) => {
+        if (acc === null || acc === undefined) {
+          return defaultType;
         }
-        return acc[key][index];
-      }
 
-      if (acc[part] === undefined) {
-        this.set(binding, defaultType);
-        return this.get[binding];
-      }
-      return acc[part];
-    }, this.#data);
+        const arrayMatch = part.match(/(\d+)/);
+        if (arrayMatch) {
+          const index = arrayMatch[0];
+          if (!acc || acc[index] === undefined) {
+            return defaultType;
+          }
+          return acc[index];
+        }
+
+        if (acc[part] === undefined) {
+          return defaultType;
+        }
+        return acc[part];
+      }, this.#data);
 
     return value;
   }
@@ -192,25 +179,16 @@ class MateriaJS {
    * @param {*} value - The value to push to the binding.
    */
   push(binding, value) {
-    const keys = binding.split(/[\.\[\]]/).filter(Boolean),
-      hook = keys[0];
+    let target = this.get(binding);
 
-    if (this.#data[hook] === undefined) {
-      console.error(`Error: ${hook} is not defined.`);
-      return;
-    }
-
-    let target = this.get(binding, "array");
-
-    if (target === null) {
+    if (target === "") {
       target = [];
       // then we need to replace the null value with an empty array
       this.set(binding, target);
     }
 
     if (!target) {
-      console.log(this.get(binding));
-      console.error(`Error: ${binding} is not defined.`);
+      console.error(`Error: binding ${binding} is not defined.`);
       return;
     }
 
@@ -228,7 +206,7 @@ class MateriaJS {
    */
   setInArray(binding, query, value) {
     // Get the value from the binding
-    const target = this.get(bindin, "array");
+    const target = this.get(binding, "array");
 
     if (!target) {
       console.error(`Error: ${binding} is not defined.`);
@@ -479,6 +457,11 @@ class MateriaJS {
   #setChildren(element, key, value, depth, parentBinding) {
     let children = key === "children" ? value : [value];
 
+    if (children === null) {
+      // transform it into an empty array
+      children = [];
+    }
+
     // check to see if the children value is valid
     if (!Array.isArray(children)) {
       console.error(
@@ -619,6 +602,19 @@ class MateriaJS {
       const query = "[data-handler-id='" + element + "']";
       element = document.querySelector(query);
       handler.element = element;
+    }
+
+    // Check if the element is a DOM element and if it no longer exists
+    if (element instanceof Element && !document.body.contains(element)) {
+      // Remove the handler from the list of handlers
+      const handlers = this.#handlers[binding];
+      if (handlers) {
+        const index = handlers.indexOf(handler);
+        if (index > -1) {
+          handlers.splice(index, 1);
+        }
+      }
+      return; // Exit the function as the element no longer exists
     }
 
     this.#setElementAttribute(element, property, value);
@@ -1070,7 +1066,7 @@ class MateriaJS {
               element,
               key,
               value,
-              pipe,
+              { ...pipe },
               binding,
               depth
             );
