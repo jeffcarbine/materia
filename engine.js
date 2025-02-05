@@ -103,31 +103,33 @@ export default async (app) => {
 const renderView = async (view, _data, callback) => {
   const Materia = new MateriaJS();
 
-  const config = view.data;
+  const viewData = view.data;
 
-  if (config && typeof config === "object") {
-    for (const key in config) {
-      const data =
-        typeof config[key] === "function"
-          ? await config[key](_data)
-          : config[key];
+  if (viewData) {
+    if (typeof viewData === "object") {
+      for (const key in viewData) {
+        const data =
+          typeof viewData[key] === "function"
+            ? await viewData[key](_data)
+            : viewData[key];
 
-      await handledata(Materia, key, data);
+        await handledata(Materia, key, data);
 
-      // if (endpoint) {
-      //   if (typeof endpoint === "string") {
-      //     Materia.setEndpoint(key, endpoint);
-      //   } else {
-      //     console.error(
-      //       `Error in endpoints: Expected string for key "${key}", but got ${typeof endpoint}.`
-      //     );
-      //   }
-      // }
+        // if (endpoint) {
+        //   if (typeof endpoint === "string") {
+        //     Materia.setEndpoint(key, endpoint);
+        //   } else {
+        //     console.error(
+        //       `Error in endpoints: Expected string for key "${key}", but got ${typeof endpoint}.`
+        //     );
+        //   }
+        // }
+      }
+    } else {
+      console.error(
+        `Error in data: Expected an object, but got ${typeof config}.`
+      );
     }
-  } else {
-    console.error(
-      `Error in data: Expected an object, but got ${typeof config}.`
-    );
   }
 
   const html = Materia.render(view.default(_data));

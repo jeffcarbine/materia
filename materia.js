@@ -283,11 +283,6 @@ class MateriaJS {
         for (const handler of this.#handlers[binding]) {
           this.#handle(binding, handler);
         }
-      } else {
-        const parentBinding = binding.replace(/(\.[^\.]*|\[\d+\])$/, "");
-        if (parentBinding !== binding) {
-          await checkHandlers(parentBinding);
-        }
       }
     };
 
@@ -533,6 +528,10 @@ class MateriaJS {
     for (let key in pipe) {
       if (typeof pipe[key] === "function") {
         pipe[key] = this.#stringifyFunction(pipe[key]);
+      } else if (typeof pipe[key] === "object" && pipe[key] !== null) {
+        if (pipe[key].path && !pipe[key].path.startsWith("import::")) {
+          pipe[key].path = `import::${pipe[key].path}`;
+        }
       }
     }
     return pipe;
@@ -605,16 +604,18 @@ class MateriaJS {
     }
 
     // Check if the element is a DOM element and if it no longer exists
-    if (element instanceof Element && !document.body.contains(element)) {
-      // Remove the handler from the list of handlers
-      const handlers = this.#handlers[binding];
-      if (handlers) {
-        const index = handlers.indexOf(handler);
-        if (index > -1) {
-          handlers.splice(index, 1);
+    if (element instanceof Element) {
+      if (!document.body.contains(element) && element.tagName !== "HTML") {
+        // Remove the handler from the list of handlers
+        const handlers = this.#handlers[binding];
+        if (handlers) {
+          const index = handlers.indexOf(handler);
+          if (index > -1) {
+            handlers.splice(index, 1);
+          }
         }
+        return; // Exit the function as the element no longer exists
       }
-      return; // Exit the function as the element no longer exists
     }
 
     this.#setElementAttribute(element, property, value);
@@ -684,13 +685,7 @@ class MateriaJS {
     let target = element;
 
     if (isServer) {
-      // create a unique id for the element
-      const delegateId = this.#generateUniqueId();
-
-      // set the delegate id on the element
-      element.dataset.delegateId = delegateId;
-
-      target = delegateId;
+      target = element.dataset.delegateId;
     }
 
     if (isServer) {
@@ -713,6 +708,15 @@ class MateriaJS {
     if (this.#delegate[event] === undefined) {
       // if it doesn't, then set that delegate event to an empty array
       this.#delegate[event] = [];
+    }
+
+    // check to see if the pipe has any path values that need to be promoted
+    if (pipe) {
+      for (let key in pipe) {
+        if (typeof pipe[key] === "object" && pipe[key].path) {
+          pipe[key] = pipe[key].path;
+        }
+      }
     }
 
     const eventData = {
@@ -750,7 +754,7 @@ class MateriaJS {
    * Handles an event
    * @param {Event} event - The event to handle
    */
-  #eventHandler(event) {
+  async #eventHandler(event) {
     // empty eventObj so we can properly pass what
     // delegate event we are going to match this event to
     var eventArr;
@@ -768,12 +772,8 @@ class MateriaJS {
       eventArr = this.#delegate[event.type];
     }
 
-    eventArr.forEach(async (eventObj) => {
+    for (const eventObj of eventArr) {
       let { target, func, pipe, preventDefault } = eventObj;
-
-      if (pipe) {
-        pipe = await this.#plumb(pipe);
-      }
 
       // if the target is a string, then we need to get the element
       // and update the delegate
@@ -788,7 +788,7 @@ class MateriaJS {
         eventObj.func = func;
       }
 
-      // check whether the element or it's direct parent match
+      // check whether the element or its direct parent match
       // the key
       let match = this.#getMatchingTarget(event, target);
 
@@ -802,22 +802,17 @@ class MateriaJS {
           disabled = true;
         }
 
-        // prevent clicks by default unless preventDefault is false
-        // if (event.type === "click") {
-        //   if (preventDefault !== false) {
-        //     event.preventDefault();
-        //   }
-        //   // and for everything else, prevent default if preventDefault is true
-        // } else if (preventDefault) {
-        //   event.preventDefault();
-        // }
-
         // run the function and pass the target
         if (!disabled) {
+          if (preventDefault) event.preventDefault();
+
+          if (pipe) pipe = await this.#plumb(pipe);
+
           func(match, pipe, event);
+          break; // Exit the loop once a match is found
         }
       }
-    });
+    }
   }
 
   loadHandler() {
@@ -853,18 +848,18 @@ class MateriaJS {
    */
   #mutationConfig = {
     attributes: true,
-    attributeFilter: [
-      "class",
-      "id",
-      "value",
-      "data-icon",
-      "data-active",
-      "data-state",
-      "data-page",
-      "checked",
-      "open",
-      "style",
-    ],
+    // attributeFilter: [
+    //   "class",
+    //   "id",
+    //   "value",
+    //   "data-icon",
+    //   "data-active",
+    //   "data-state",
+    //   "data-page",
+    //   "checked",
+    //   "open",
+    //   "style",
+    // ],
     childList: true,
     subtree: true,
     characterData: true,
@@ -972,7 +967,7 @@ class MateriaJS {
         // mutation or if the element exists as a child
         // of the mutation
         if (mutationTarget.nodeType === 1 && mutationTarget === target) {
-          func(mutationTarget, mutation, pipe);
+          func(mutationTarget, pipe, mutation);
         }
       });
     }
@@ -1045,6 +1040,11 @@ class MateriaJS {
       if (this.#eventTypes.includes(key) || key.startsWith("attributes:")) {
         // check to see if the default should be prevented
         const preventDefault = preventDefaults.includes(key);
+
+        // create a delegateId if the element doesn't already have one
+        if (!element.dataset.delegateId) {
+          element.dataset.delegateId = this.#generateUniqueId();
+        }
 
         this.#addEventDelegate(element, key, value, pipe, preventDefault);
       } else {
@@ -1198,7 +1198,7 @@ class MateriaJS {
 
           if (typeof value === "object" && value.data && value.path) {
             // assign the data to the clientPipe
-            pipe[key] = "import::" + value.path;
+            pipe[key] = value.path;
           } else {
             pipe[key] = value;
           }
