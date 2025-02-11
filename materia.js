@@ -653,6 +653,8 @@ class MateriaJS {
     "submit",
     "reset",
     "focus",
+    "focusin",
+    "focusout",
     "blur",
     "touchstart",
     "touchmove",
@@ -664,6 +666,7 @@ class MateriaJS {
     "message",
     "open",
     "close",
+    "input",
 
     // mutations
     "childList",
@@ -708,6 +711,9 @@ class MateriaJS {
     if (this.#delegate[event] === undefined) {
       // if it doesn't, then set that delegate event to an empty array
       this.#delegate[event] = [];
+
+      // Add a new event listener for that event
+      document.addEventListener(event, this.#eventHandler.bind(this), false);
     }
 
     // check to see if the pipe has any path values that need to be promoted
@@ -1311,34 +1317,89 @@ class MateriaJS {
     });
   }
 
-  destroy(binding) {
-    const keys = binding.split(/[\.\[\]]/).filter(Boolean),
-      hook = keys[0];
+  destroy(bindingOrElement) {
+    if (typeof bindingOrElement === "string") {
+      const keys = bindingOrElement.split(/[\.\[\]]/).filter(Boolean),
+        hook = keys[0];
 
-    // Delete the data at the binding
-    const deleteData = (target, index) => {
-      if (index === keys.length - 1) {
-        delete target[keys[index]];
-      } else {
-        deleteData(target[keys[index]], index + 1);
-      }
-    };
-
-    if (this.#data[hook]) {
-      deleteData(this.#data, 0);
-    }
-
-    // Remove any elements bound to that binding
-    if (this.#handlers[binding]) {
-      this.#handlers[binding].forEach((bind) => {
-        if (bind.element && bind.element.parentNode) {
-          bind.element.parentNode.removeChild(bind.element);
+      // Delete the data at the binding
+      const deleteData = (target, index) => {
+        if (index === keys.length - 1) {
+          delete target[keys[index]];
+        } else {
+          deleteData(target[keys[index]], index + 1);
         }
-      });
-    }
+      };
 
-    // Remove any handlers attached to that binding
-    delete this.#handlers[binding];
+      if (this.#data[hook]) {
+        deleteData(this.#data, 0);
+      }
+
+      // Remove any elements bound to that binding
+      if (this.#handlers[bindingOrElement]) {
+        this.#handlers[bindingOrElement].forEach((bind) => {
+          if (bind.element && bind.element.parentNode) {
+            bind.element.parentNode.removeChild(bind.element);
+          }
+        });
+      }
+
+      // Remove any handlers attached to that binding
+      delete this.#handlers[bindingOrElement];
+    } else if (bindingOrElement instanceof Element) {
+      const element = bindingOrElement;
+
+      // Define an async function to handle the asynchronous operations
+      const asyncDestroy = async () => {
+        // Remove any handlers connected to this element
+        for (const binding in this.#handlers) {
+          this.#handlers[binding] = this.#handlers[binding].filter(
+            (handler) => {
+              let handlerElement = handler.element;
+              if (typeof handlerElement === "string") {
+                handlerElement = document.querySelector(
+                  `[data-handler-id="${handlerElement}"]`
+                );
+              }
+              if (
+                handlerElement === element ||
+                element.contains(handlerElement)
+              ) {
+                return false;
+              }
+              return true;
+            }
+          );
+        }
+
+        // Remove any delegates connected to this element
+        for (const event in this.#delegate) {
+          this.#delegate[event] = this.#delegate[event].filter((delegate) => {
+            let delegateTarget = delegate.target;
+            if (typeof delegateTarget === "string") {
+              delegateTarget = document.querySelector(
+                `[data-delegate-id="${delegateTarget}"]`
+              );
+            }
+            if (
+              delegateTarget === element ||
+              element.contains(delegateTarget)
+            ) {
+              return false;
+            }
+            return true;
+          });
+        }
+
+        // Remove the element from the DOM
+        if (element.parentNode) {
+          element.parentNode.removeChild(element);
+        }
+      };
+
+      // Call the async function
+      asyncDestroy();
+    }
   }
 }
 

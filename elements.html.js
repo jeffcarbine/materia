@@ -458,6 +458,8 @@ const validAttributes = [
   "submit",
   "reset",
   "focus",
+  "focusin",
+  "focusout",
   "blur",
   "touchstart",
   "touchmove",
@@ -469,6 +471,7 @@ const validAttributes = [
   "message",
   "open",
   "close",
+  "input",
 
   // mutation types
   "childList",
