@@ -814,7 +814,7 @@ class MateriaJS {
 
           if (pipe) pipe = await this.#plumb(pipe);
 
-          func(match, pipe, event);
+          func(match, pipe, elements);
           break; // Exit the loop once a match is found
         }
       }
@@ -844,7 +844,7 @@ class MateriaJS {
           delegate.func = func;
         }
 
-        func(target, pipe);
+        func(target, pipe, elements);
       });
     }
   }
