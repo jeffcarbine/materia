@@ -516,6 +516,19 @@ const form = new Form({
     // default is now prevented properly
   },
 });
+
+const form2 = new Form({
+  preventDefault: ["submit", "click"], // multiple defaults to prevent
+  submit: (form, pipe, event) => {
+    // default is now prevented properly
+  },
+  click: (form, pipe, event) => {
+    // default is prevented here too
+  },
+  mouseover: (form, pipe, event) => {
+    // default is not prevented here
+  },
+});
 ```
 
 ## Contributing
