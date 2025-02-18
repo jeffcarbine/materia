@@ -24,6 +24,8 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
     - [Client-side Pipe](#client-side-pipe)
     - [Server-side Pipe](#server-side-pipe)
   - [Updating the data](#updating-the-data)
+- [Events](#events)
+  - [Preventing Default](#preventing-default)
 - [Contributing](#contributing)
 - [License](#license)
 - [Contact](#contact)
@@ -460,6 +462,60 @@ const element = new Div({
 
 materia.set("test.name.first", "Joe"); // will conly cause the "test-name" bound element to re-render
 materia.set("test.class", "new-class"); // will cause the "test" bound elements to re-render
+```
+
+## Events
+
+You can add event delegation to any element by passing an anonymous function to the event key name.
+
+The anonymous function accepts three parameters:
+
+- the element itself
+- the pipe
+- the event
+
+```js
+const button = new Button({
+  class: "submit",
+  pipe: {
+    CustomComponent: {
+      data: CustomComponent,
+      path: "/path/to/custom/component",
+    },
+  },
+  click: (button, pipe, event) => {
+    const { CustomComponent } = pipe;
+
+    const eventType = event.type;
+
+    Materia.render(CustomComponent(eventType), (element) => {
+      button.appendChild(element);
+    });
+  },
+});
+```
+
+### Preventing default
+
+Since Materia handles it's events via delegation, you can't preventDefault inside the anonymous function.
+
+```js
+const form = new Form({
+  submit: (form, pipe, event) {
+    event.preventDefault(); // will not work
+  }
+})
+```
+
+Instead, you can pass a preventDefault value to the element with either a string or an array of strings of the events you want to preven default on
+
+```js
+const form = new Form({
+  preventDefault: "submit",
+  submit: (form, pipe, event) => {
+    // default is now prevented properly
+  },
+});
 ```
 
 ## Contributing
