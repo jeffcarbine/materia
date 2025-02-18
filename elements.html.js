@@ -1,573 +1,72 @@
-const validAttributes = [
-  "accept",
-  "accept-charset",
-  "accesskey",
-  "action",
-  "align",
-  "alt",
-  "async",
-  "autocapitalize",
-  "autocomplete",
-  "autofocus",
-  "autoplay",
-  "background",
-  "bgcolor",
-  "border",
-  "buffered",
-  "challenge",
-  "charset",
-  "checked",
-  "cite",
-  "class",
-  "code",
-  "codebase",
-  "color",
-  "cols",
-  "colspan",
-  "content",
-  "contenteditable",
-  "contextmenu",
-  "controls",
-  "coords",
-  "crossorigin",
-  "data",
-  "datetime",
-  "decoding",
-  "default",
-  "defer",
-  "dir",
-  "dirname",
-  "disabled",
-  "download",
-  "draggable",
-  "dropzone",
-  "enctype",
-  "for",
-  "form",
-  "formaction",
-  "formmethod",
-  "formnovalidate",
-  "formtarget",
-  "headers",
-  "height",
-  "hidden",
-  "high",
-  "href",
-  "hreflang",
-  "http-equiv",
-  "icon",
-  "id",
-  "importance",
-  "inputmode",
-  "integrity",
-  "ismap",
-  "itemprop",
-  "itemscope",
-  "itemtype",
-  "keytype",
-  "kind",
-  "label",
-  "lang",
-  "language",
-  "loading",
-  "list",
-  "loop",
-  "low",
-  "manifest",
-  "max",
-  "maxlength",
-  "minlength",
-  "media",
-  "method",
-  "min",
-  "multiple",
-  "muted",
-  "name",
-  "novalidate",
-  "open",
-  "optimum",
-  "pattern",
-  "ping",
-  "placeholder",
-  "poster",
-  "preload",
-  "radiogroup",
-  "readonly",
-  "referrerpolicy",
-  "rel",
-  "required",
-  "reversed",
-  "role",
-  "rows",
-  "rowspan",
-  "sandbox",
-  "scope",
-  "scoped",
-  "selected",
-  "shape",
-  "size",
-  "sizes",
-  "slot",
-  "span",
-  "spellcheck",
-  "src",
-  "srcdoc",
-  "srclang",
-  "srcset",
-  "start",
-  "step",
-  "style",
-  "summary",
-  "tabindex",
-  "target",
-  "title",
-  "translate",
-  "type",
-  "usemap",
-  "value",
-  "width",
-  "wrap",
-  "results",
-
-  // ARIA attributes
-  "aria-activedescendant",
-  "aria-atomic",
-  "aria-autocomplete",
-  "aria-busy",
-  "aria-checked",
-  "aria-colcount",
-  "aria-colindex",
-  "aria-colspan",
-  "aria-controls",
-  "aria-current",
-  "aria-describedby",
-  "aria-details",
-  "aria-disabled",
-  "aria-dropeffect",
-  "aria-errormessage",
-  "aria-expanded",
-  "aria-flowto",
-  "aria-grabbed",
-  "aria-haspopup",
-  "aria-hidden",
-  "aria-invalid",
-  "aria-keyshortcuts",
-  "aria-label",
-  "aria-labelledby",
-  "aria-level",
-  "aria-live",
-  "aria-modal",
-  "aria-multiline",
-  "aria-multiselectable",
-  "aria-orientation",
-  "aria-owns",
-  "aria-placeholder",
-  "aria-posinset",
-  "aria-pressed",
-  "aria-readonly",
-  "aria-relevant",
-  "aria-required",
-  "aria-roledescription",
-  "aria-rowcount",
-  "aria-rowindex",
-  "aria-rowspan",
-  "aria-selected",
-  "aria-setsize",
-  "aria-sort",
-  "aria-valuemax",
-  "aria-valuemin",
-  "aria-valuenow",
-  "aria-valuetext",
-
-  // svg attributes
-  "accent-height",
-  "accumulate",
-  "additive",
-  "alignment-baseline",
-  "allowReorder",
-  "alphabetic",
-  "amplitude",
-  "arabic-form",
-  "ascent",
-  "attributeName",
-  "attributeType",
-  "autoReverse",
-  "azimuth",
-  "baseFrequency",
-  "baseline-shift",
-  "baseProfile",
-  "bbox",
-  "begin",
-  "bias",
-  "by",
-  "calcMode",
-  "cap-height",
-  "class",
-  "clip",
-  "clipPathUnits",
-  "clip-path",
-  "clip-rule",
-  "color",
-  "color-interpolation",
-  "color-interpolation-filters",
-  "color-profile",
-  "color-rendering",
-  "contentScriptType",
-  "contentStyleType",
-  "cursor",
-  "cx",
-  "cy",
-  "d",
-  "decelerate",
-  "descent",
-  "diffuseConstant",
-  "direction",
-  "display",
-  "divisor",
-  "dominant-baseline",
-  "dur",
-  "dx",
-  "dy",
-  "edgeMode",
-  "elevation",
-  "enable-background",
-  "end",
-  "exponent",
-  "externalResourcesRequired",
-  "fill",
-  "fill-opacity",
-  "fill-rule",
-  "filter",
-  "filterRes",
-  "filterUnits",
-  "flood-color",
-  "flood-opacity",
-  "font-family",
-  "font-size",
-  "font-size-adjust",
-  "font-stretch",
-  "font-style",
-  "font-variant",
-  "font-weight",
-  "format",
-  "from",
-  "fr",
-  "fx",
-  "fy",
-  "g1",
-  "g2",
-  "glyph-name",
-  "glyph-orientation-horizontal",
-  "glyph-orientation-vertical",
-  "glyphRef",
-  "gradientTransform",
-  "gradientUnits",
-  "hanging",
-  "height",
-  "href",
-  "hreflang",
-  "horiz-adv-x",
-  "horiz-origin-x",
-  "id",
-  "ideographic",
-  "image-rendering",
-  "in",
-  "in2",
-  "intercept",
-  "k",
-  "k1",
-  "k2",
-  "k3",
-  "k4",
-  "kernelMatrix",
-  "kernelUnitLength",
-  "kerning",
-  "keyPoints",
-  "keySplines",
-  "keyTimes",
-  "lang",
-  "lengthAdjust",
-  "letter-spacing",
-  "lighting-color",
-  "limitingConeAngle",
-  "local",
-  "marker-end",
-  "marker-mid",
-  "marker-start",
-  "markerHeight",
-  "markerUnits",
-  "markerWidth",
-  "mask",
-  "maskContentUnits",
-  "maskUnits",
-  "mathematical",
-  "max",
-  "media",
-  "method",
-  "min",
-  "mode",
-  "name",
-  "numOctaves",
-  "offset",
-  "opacity",
-  "operator",
-  "order",
-  "orient",
-  "orientation",
-  "origin",
-  "overflow",
-  "overline-position",
-  "overline-thickness",
-  "panose-1",
-  "paint-order",
-  "path",
-  "pathLength",
-  "patternContentUnits",
-  "patternTransform",
-  "patternUnits",
-  "pointer-events",
-  "points",
-  "pointsAtX",
-  "pointsAtY",
-  "pointsAtZ",
-  "preserveAlpha",
-  "preserveAspectRatio",
-  "primitiveUnits",
-  "r",
-  "radius",
-  "refX",
-  "refY",
-  "rendering-intent",
-  "repeatCount",
-  "repeatDur",
-  "requiredExtensions",
-  "requiredFeatures",
-  "restart",
-  "result",
-  "rotate",
-  "rx",
-  "ry",
-  "scale",
-  "seed",
-  "shape-rendering",
-  "slope",
-  "spacing",
-  "specularConstant",
-  "specularExponent",
-  "speed",
-  "spreadMethod",
-  "startOffset",
-  "stdDeviation",
-  "stemh",
-  "stemv",
-  "stitchTiles",
-  "stop-color",
-  "stop-opacity",
-  "strikethrough-position",
-  "strikethrough-thickness",
-  "string",
-  "stroke",
-  "stroke-dasharray",
-  "stroke-dashoffset",
-  "stroke-linecap",
-  "stroke-linejoin",
-  "stroke-miterlimit",
-  "stroke-opacity",
-  "stroke-width",
-  "surfaceScale",
-  "systemLanguage",
-  "tableValues",
-  "target",
-  "targetX",
-  "targetY",
-  "text-anchor",
-  "text-decoration",
-  "text-rendering",
-  "textLength",
-  "to",
-  "transform",
-  "type",
-  "u1",
-  "u2",
-  "underline-position",
-  "underline-thickness",
-  "unicode",
-  "unicode-bidi",
-  "unicode-range",
-  "units-per-em",
-  "v-alphabetic",
-  "v-hanging",
-  "v-ideographic",
-  "v-mathematical",
-  "values",
-  "vector-effect",
-  "version",
-  "vert-adv-y",
-  "vert-origin-x",
-  "vert-origin-y",
-  "viewBox",
-  "viewTarget",
-  "visibility",
-  "width",
-  "widths",
-  "word-spacing",
-  "writing-mode",
-  "x",
-  "x-height",
-  "x1",
-  "x2",
-  "xChannelSelector",
-  "xlink:actuate",
-  "xlink:arcrole",
-  "xlink:href",
-  "xlink:role",
-  "xlink:show",
-  "xlink:title",
-  "xlink:type",
-  "xml:base",
-  "xml:lang",
-  "xml:space",
-  "y",
-  "y1",
-  "y2",
-  "yChannelSelector",
-  "z",
-  "zoomAndPan",
-
-  // event types
-  "click",
-  "dblclick",
-  "mousedown",
-  "mouseup",
-  "mouseover",
-  "mouseout",
-  "mousemove",
-  "mouseenter",
-  "mouseleave",
-  "keydown",
-  "keypress",
-  "keyup",
-  "load",
-  "unload",
-  "abort",
-  "error",
-  "resize",
-  "scroll",
-  "select",
-  "change",
-  "submit",
-  "reset",
-  "focus",
-  "focusin",
-  "focusout",
-  "blur",
-  "touchstart",
-  "touchmove",
-  "touchend",
-  "touchcancel",
-  "gesturestart",
-  "gesturechange",
-  "gestureend",
-  "message",
-  "open",
-  "close",
-  "input",
-
-  // mutation types
-  "childList",
-  "characterData",
-  "subtree",
-
-  // materia specific attributes
-  "if",
-  "child",
-  "children",
-  "textContent",
-  "innerHTML",
-  "binding",
-  "components",
-  "pipe",
-  "preventDefault",
-];
+import validAttributes from "./attributes.js";
 
 export class Element {
   initialize(params) {
     if (typeof params === "object") {
       if (Array.isArray(params)) {
-        switch (this.tagName) {
-          case "ul":
-          case "ol":
-            this.children = params.map((item) =>
-              item instanceof Li ? item : new Li(item)
-            );
-            break;
-          case "dl":
-            this.children = params.map((item) =>
-              item instanceof Dt ? item : new Dt(item)
-            );
-            break;
-          case "select":
-            this.children = params.map((item) =>
-              item instanceof Option ? item : new Option(item)
-            );
-            break;
-          case "thead":
-            this.child = new Tr(
-              params.map((cell) => (cell instanceof Th ? cell : new Th(cell)))
-            );
-            break;
-          case "tbody":
-            this.children = params.map(
-              (row) =>
-                new Tr(
-                  row.map((cell, index) =>
-                    index === 0
-                      ? cell instanceof Th
-                        ? cell
-                        : new Th(cell)
-                      : cell instanceof Td
-                      ? cell
-                      : new Td(cell)
-                  )
-                )
-            );
-            break;
-          default:
-            this.children =
-              this.children !== undefined
-                ? this.children.concat(params)
-                : params;
-        }
+        this.handleArrayParams(params);
       } else if (params instanceof Element) {
         this.child = params;
       } else {
-        for (let key in params) {
-          if (
-            validAttributes.includes(key) ||
-            key.startsWith("data-") ||
-            key.startsWith("attributes:")
-          ) {
-            this[key] = params[key];
-          }
-        }
+        this.handleObjectParams(params);
       }
-    } else if (
-      typeof params === "string" ||
-      typeof params === "number" ||
-      typeof params === "function"
-    ) {
-      switch (this.tagName) {
-        case "img":
-        case "script":
-          this.src = params;
-          break;
-        case "link":
-          this.href = params;
-          break;
-        default:
-          this.textContent = params;
+    } else {
+      this.handlePrimitiveParams(params);
+    }
+  }
+
+  handleArrayParams(params) {
+    const tagHandlers = {
+      ul: (item) => (item instanceof Li ? item : new Li(item)),
+      ol: (item) => (item instanceof Li ? item : new Li(item)),
+      dl: (item) => (item instanceof Dt ? item : new Dt(item)),
+      select: (item) => (item instanceof Option ? item : new Option(item)),
+      thead: (params) => new Tr(params.map((cell) => (cell instanceof Th ? cell : new Th(cell)))),
+      tbody: (params) =>
+        params.map(
+          (row) =>
+            new Tr(
+              row.map((cell, index) =>
+                index === 0
+                  ? cell instanceof Th
+                    ? cell
+                    : new Th(cell)
+                  : cell instanceof Td
+                  ? cell
+                  : new Td(cell)
+              )
+            )
+        ),
+    };
+
+    if (tagHandlers[this.tagName]) {
+      this.children = params.map(tagHandlers[this.tagName]);
+    } else {
+      this.children = this.children ? this.children.concat(params) : params;
+    }
+  }
+
+  handleObjectParams(params) {
+    for (let key in params) {
+      if (
+        validAttributes.includes(key) ||
+        key.startsWith("data-") ||
+        key.startsWith("attributes:")
+      ) {
+        this[key] = params[key];
       }
     }
+  }
+
+  handlePrimitiveParams(params) {
+    const primitiveHandlers = {
+      img: (params) => (this.src = params),
+      script: (params) => (this.src = params),
+      link: (params) => (this.href = params),
+      default: (params) => (this.textContent = params),
+    };
+
+    (primitiveHandlers[this.tagName] || primitiveHandlers.default)(params);
   }
 }
 
@@ -578,27 +77,12 @@ export class Html extends Element {
     this.initialize(params);
   }
 }
-
-export class Base extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "base";
-    this.initialize(params);
-  }
-}
-
-/**
- * Represents the head section of an HTML document.
- */
 export class Head extends Element {
-  /**
-   * Creates an instance of Head.
-   *
-   * @param {Object} params - The parameters for the head section.
-   */
+
   constructor(params) {
     super(params);
     this.tagName = "head";
+    this.initialize(params);
   }
 }
 
@@ -1462,21 +946,8 @@ export class Form extends Element {
 export class Input extends Element {
   constructor(params) {
     super(params);
-
-    // if (params.label) {
-    //   // Set the tagName to "label" and create a child Input element
-    //   this.tagName = "label";
-    //   this.initialize(params.label);
-
-    //   const paramsNoLabel = { ...params };
-    //   delete paramsNoLabel.label;
-
-    //   this.child = new Input({ ...paramsNoLabel });
-    // } else {
-    // Set the tagName to "input"
     this.tagName = "input";
     this.initialize(params);
-    //}
   }
 }
 
@@ -1594,8 +1065,8 @@ export class CheckboxInput extends Input {
 
 export class RadioInput extends Input {
   constructor(params) {
-    params.type = "radio";
     super(params);
+    this.type = "radio";
   }
 }
 
