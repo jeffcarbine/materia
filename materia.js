@@ -293,6 +293,17 @@ class MateriaJS {
   }
 
   /**
+   * Manually runs a binding
+   */
+  run(binding) {
+    if (this.#handlers[binding]) {
+      for (const handler of this.#handlers[binding]) {
+        this.#handle(binding, handler);
+      }
+    }
+  }
+
+  /**
    * The data object for the data bindings.
    */
   #data = {};
@@ -1075,8 +1086,8 @@ class MateriaJS {
       return null;
     }
 
-    // Check if the template has an "if" property and if it's false or undefined, return null
-    if (template.hasOwnProperty("if") && !template.if) {
+    // Check if the template has an "if" property and if it's f alse or undefined, return null
+    if (template.hasOwnProperty("if") && template.if == false) {
       return null;
     }
 
