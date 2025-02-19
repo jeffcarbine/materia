@@ -1,7 +1,7 @@
 import validAttributes from "./attributes.js";
 
 export class Element {
-  initialize(params) {
+  initialize(params = {}) {
     if (typeof params === "object") {
       if (Array.isArray(params)) {
         this.handleArrayParams(params);
@@ -21,7 +21,10 @@ export class Element {
       ol: (item) => (item instanceof Li ? item : new Li(item)),
       dl: (item) => (item instanceof Dt ? item : new Dt(item)),
       select: (item) => (item instanceof Option ? item : new Option(item)),
-      thead: (params) => new Tr(params.map((cell) => (cell instanceof Th ? cell : new Th(cell)))),
+      thead: (params) =>
+        new Tr(
+          params.map((cell) => (cell instanceof Th ? cell : new Th(cell)))
+        ),
       tbody: (params) =>
         params.map(
           (row) =>
@@ -42,7 +45,7 @@ export class Element {
     if (tagHandlers[this.tagName]) {
       this.children = params.map(tagHandlers[this.tagName]);
     } else {
-      this.children = this.children ? this.children.concat(params) : params;
+      this.children = params;
     }
   }
 
@@ -78,7 +81,6 @@ export class Html extends Element {
   }
 }
 export class Head extends Element {
-
   constructor(params) {
     super(params);
     this.tagName = "head";

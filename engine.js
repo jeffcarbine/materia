@@ -98,6 +98,9 @@ export default async (app) => {
   app.get("/materiajs/elements", (req, res) => {
     res.sendFile(path.join(__dirname, "elements.html.js"));
   });
+  app.get("/materiajs/attributes.js", (req, res) => {
+    res.sendFile(path.join(__dirname, "attributes.js"));
+  });
 };
 
 const renderView = async (view, _data, callback) => {

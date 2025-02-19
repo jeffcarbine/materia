@@ -436,6 +436,7 @@ export default [
 
   // event types
   "click",
+  "clickOutside",
   "dblclick",
   "mousedown",
   "mouseup",
