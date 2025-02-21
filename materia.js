@@ -1358,6 +1358,7 @@ class MateriaJS {
         importMap.textContent = JSON.stringify({
           imports: {
             "materiajs/elements": "/materiajs/elements",
+            "@jeffcarbine/premmio/": "/node_modules/@jeffcarbine/premmio/",
           },
         });
         head.appendChild(importMap);
