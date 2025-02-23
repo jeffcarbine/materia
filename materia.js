@@ -1085,9 +1085,12 @@ class MateriaJS {
     if (!template) {
       return null;
     }
+    if (template.hasOwnProperty("if")) {
+      console.log(template);
+    }
 
-    // Check if the template has an "if" property and if it's f alse or undefined, return null
-    if (template.hasOwnProperty("if") && template.if == false) {
+    // Check if the template has an "if" property and if it's falsy, return null
+    if (template.hasOwnProperty("if") && !template.if) {
       return null;
     }
 
