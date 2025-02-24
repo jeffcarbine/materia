@@ -756,7 +756,13 @@ class MateriaJS {
       eventData.name = func.name;
     }
 
-    this.#delegate[event].push(eventData);
+    if (event === "load" && !isServer) {
+      // then we need to run this function immediately
+      // because we are rendering on the client side
+      func(target, pipe, elements);
+    } else {
+      this.#delegate[event].push(eventData);
+    }
   }
 
   /**
