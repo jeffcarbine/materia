@@ -759,7 +759,7 @@ class MateriaJS {
     if (event === "load" && !isServer) {
       // then we need to run this function immediately
       // because we are rendering on the client side
-      func(target, pipe, elements);
+      this.#stashedLoadEvent = eventData;
     } else {
       this.#delegate[event].push(eventData);
     }
@@ -1079,6 +1079,8 @@ class MateriaJS {
     });
   }
 
+  #stashedLoadEvent = null;
+
   /**
    * Renders the template into HTML.
    *
@@ -1167,6 +1169,31 @@ class MateriaJS {
     if (isServer && depth === 0) {
       return this.#handleServerSideRendering(element);
     } else {
+      // if we have a stashed load event, run it
+      if (this.#stashedLoadEvent) {
+        const { target, func, pipe } = this.#stashedLoadEvent;
+
+        // we can only run this once the element has been appended to the body, so we need to wait
+        // until we can detect that the target has a parentNode of some kind
+        const maxWaitTime = 5000; // Maximum wait time in milliseconds
+        const intervalTime = 10; // Interval time in milliseconds
+        let elapsedTime = 0;
+
+        const interval = setInterval(() => {
+          if (target.parentNode) {
+            func(target, pipe, elements);
+            clearInterval(interval);
+          } else {
+            elapsedTime += intervalTime;
+            if (elapsedTime >= maxWaitTime) {
+              console.warn(
+                `Giving up after ${maxWaitTime}ms: target element not found in DOM.`
+              );
+              clearInterval(interval);
+            }
+          }
+        }, intervalTime);
+      }
       // handle client-side rendering
       if (callbackOrQuery) {
         if (typeof callbackOrQuery === "function") {
