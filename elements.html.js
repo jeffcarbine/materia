@@ -1,4 +1,16 @@
-import validAttributes from "./attributes.js";
+import {
+  validAttributes,
+  validEvents,
+  validMutations,
+  validMateriaProps,
+} from "materiajs/attributes";
+
+const validProps = [
+  ...validAttributes,
+  ...validEvents,
+  ...validMutations,
+  ...validMateriaProps,
+];
 
 export class Element {
   initialize(params = {}) {
@@ -52,7 +64,7 @@ export class Element {
   handleObjectParams(params) {
     for (let key in params) {
       if (
-        validAttributes.includes(key) ||
+        validProps.includes(key) ||
         key.startsWith("data-") ||
         key.startsWith("attributes:")
       ) {

@@ -1,5 +1,10 @@
 // Import all the elements
 import * as elements from "materiajs/elements";
+import {
+  validAttributes,
+  validEvents,
+  validMutations,
+} from "materiajs/attributes";
 
 // Standard Library Imports
 let document, fs;
@@ -347,20 +352,7 @@ class MateriaJS {
    * @returns {void}
    */
   #setElementAttribute(element, key, value, depth = 0) {
-    const nonAttributes = [
-      "children",
-      "prepend",
-      "append",
-      "child",
-      "tagName",
-      "textContent",
-      "innerHTML",
-      "if",
-      "style",
-      "binding",
-    ];
-
-    if (!nonAttributes.includes(key)) {
+    if (validAttributes.includes(key) || key.startsWith("data-")) {
       this.#setAttribute(element, key, value);
     } else if (key === "style") {
       this.#setStyle(element, value);
@@ -641,51 +633,7 @@ class MateriaJS {
   /**
    * The types of events that can be delegated.
    */
-  #eventTypes = [
-    "click",
-    "clickOutside",
-    "dblclick",
-    "mousedown",
-    "mouseup",
-    "mouseover",
-    "mouseout",
-    "mousemove",
-    "mouseenter",
-    "mouseleave",
-    "keydown",
-    "keypress",
-    "keyup",
-    "load",
-    "unload",
-    "abort",
-    "error",
-    "resize",
-    "scroll",
-    "select",
-    "change",
-    "submit",
-    "reset",
-    "focus",
-    "focusin",
-    "focusout",
-    "blur",
-    "touchstart",
-    "touchmove",
-    "touchend",
-    "touchcancel",
-    "gesturestart",
-    "gesturechange",
-    "gestureend",
-    "message",
-    "open",
-    "close",
-    "input",
-
-    // mutations
-    "childList",
-    "subtree",
-    "characterData",
-  ];
+  #eventTypes = [...validEvents, ...validMutations];
 
   /**
    * Adds an event delegate for an element
@@ -1111,8 +1059,13 @@ class MateriaJS {
       tagName
     );
 
+    // if this is the server, we need to encode the pipe
+    if (isServer) {
+      template.pipe = this.#encodePipe(template.pipe);
+    }
+
     // Pull out the pipe for this element to pass along
-    const pipe = this.#encodePipe(template.pipe);
+    const pipe = isServer ? template.pipe : this.#encodePipe(template.pipe);
 
     // Pull out the preventDefault value if there is one
     const preventDefaults = template.preventDefault
@@ -1390,7 +1343,7 @@ class MateriaJS {
         importMap.type = "importmap";
         importMap.textContent = JSON.stringify({
           imports: {
-            "materiajs/elements": "/materiajs/elements",
+            "materiajs/": "/materiajs/",
             "@jeffcarbine/premmio/": "/node_modules/@jeffcarbine/premmio/",
           },
         });

@@ -98,7 +98,7 @@ export default async (app) => {
   app.get("/materiajs/elements", (req, res) => {
     res.sendFile(path.join(__dirname, "elements.html.js"));
   });
-  app.get("/materiajs/attributes.js", (req, res) => {
+  app.get("/materiajs/attributes", (req, res) => {
     res.sendFile(path.join(__dirname, "attributes.js"));
   });
 };

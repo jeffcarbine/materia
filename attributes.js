@@ -1,4 +1,4 @@
-export default [
+export const validAttributes = [
   "accept",
   "accept-charset",
   "accesskey",
@@ -433,8 +433,9 @@ export default [
   "yChannelSelector",
   "z",
   "zoomAndPan",
+];
 
-  // event types
+export const validEvents = [
   "click",
   "clickOutside",
   "dblclick",
@@ -473,13 +474,16 @@ export default [
   "open",
   "close",
   "input",
+];
 
+export const validMutations = [
   // mutation types
   "childList",
   "characterData",
   "subtree",
+];
 
-  // materia specific attributes
+export const validMateriaProps = [
   "if",
   "child",
   "children",
