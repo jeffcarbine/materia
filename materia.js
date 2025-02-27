@@ -352,10 +352,10 @@ class MateriaJS {
    * @returns {void}
    */
   #setElementAttribute(element, key, value, depth = 0) {
-    if (validAttributes.includes(key) || key.startsWith("data-")) {
-      this.#setAttribute(element, key, value);
-    } else if (key === "style") {
+    if (key === "style") {
       this.#setStyle(element, value);
+    } else if (validAttributes.includes(key) || key.startsWith("data-")) {
+      this.#setAttribute(element, key, value);
     } else if (key === "innerHTML") {
       this.#setInnerHTML(element, value);
     } else if (key === "prepend") {

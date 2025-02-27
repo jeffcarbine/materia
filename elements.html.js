@@ -120,7 +120,7 @@ export class PreLoadStyle extends Link {
     super(params);
     this.rel = "preload";
     this.as = "style";
-    this.onload = `this.rel="stylesheet"`;
+    this.onload = "this.onload=null;this.rel='stylesheet'";
   }
 }
 
