@@ -97,34 +97,36 @@ class MateriaJS {
     return value;
   }
 
-  /**
-   * Sets the value for a binding.
-   * @param {string} binding - The binding to set the value for.
-   * @param {*} value - The value to set for the binding.
-   */
   set(binding, value) {
+    // Split the binding string into individual keys
     const keys = binding.split(/[\.\[\]]/).filter(Boolean);
     let target = this.#data;
 
+    // Iterate over the keys to traverse the data structure
     for (let i = 0; i < keys.length; i++) {
       const key = keys[i];
       const arrayMatch = key.match(/(\w+)\[(\d+)\]/);
 
       if (arrayMatch) {
+        // Handle array notation (e.g., "arrayKey[0]")
         const [, arrayKey, arrayIndex] = arrayMatch;
 
+        // Initialize the array if it doesn't exist
         if (!target[arrayKey]) {
           target[arrayKey] = [];
         }
 
+        // Ensure the target is an array
         if (!Array.isArray(target[arrayKey])) {
           console.error(`Error: ${arrayKey} is not an array.`);
           return;
         }
 
         if (i === keys.length - 1) {
+          // Set the value at the specified array index
           target[arrayKey][arrayIndex] = value;
         } else {
+          // Traverse to the next level in the array
           if (!target[arrayKey][arrayIndex]) {
             target[arrayKey][arrayIndex] = {};
           }
@@ -132,8 +134,10 @@ class MateriaJS {
         }
       } else {
         if (i === keys.length - 1) {
+          // Set the value at the specified key
           target[key] = value;
         } else {
+          // Traverse to the next level in the object
           if (!target[key]) {
             target[key] = {};
           } else if (typeof target[key] !== "object") {
@@ -147,6 +151,7 @@ class MateriaJS {
       }
     }
 
+    // Handle any updates to bindings
     this.#handleBindingUpdate(binding);
   }
 
@@ -157,7 +162,11 @@ class MateriaJS {
    */
   update(binding, data) {
     const updateRecursive = (currentBinding, currentData) => {
-      if (typeof currentData !== "object" || currentData === null) {
+      if (
+        typeof currentData !== "object" ||
+        currentData === null ||
+        Array.isArray(currentData)
+      ) {
         this.set(currentBinding, currentData);
         return;
       }
@@ -666,6 +675,23 @@ class MateriaJS {
     this.#registerEvent(event, target, pipe, func, preventDefault);
   }
 
+  #createEventListener(event) {
+    // Add a new event listener for that event
+    if (event.includes("keydown:")) {
+      // this is a special keydown event
+      const key = event.replace("keydown:", "");
+
+      // add an event listener for that specific key
+      document.addEventListener("keydown", (e) => {
+        if (e.key === key) {
+          this.#eventHandler(e);
+        }
+      });
+    } else {
+      document.addEventListener(event, this.#eventHandler.bind(this), false);
+    }
+  }
+
   /**
    * Registers an event for an element
    * @param {string} event - The event to register
@@ -679,9 +705,10 @@ class MateriaJS {
     if (this.#delegate[event] === undefined) {
       // if it doesn't, then set that delegate event to an empty array
       this.#delegate[event] = [];
+    }
 
-      // Add a new event listener for that event
-      document.addEventListener(event, this.#eventHandler.bind(this), false);
+    if (!isServer) {
+      this.#createEventListener(event);
     }
 
     // check to see if the pipe has any path values that need to be promoted
@@ -737,7 +764,7 @@ class MateriaJS {
   async #eventHandler(event) {
     // empty eventObj so we can properly pass what
     // delegate event we are going to match this event to
-    var eventArr;
+    var eventArr = this.#delegate[event.type] || [];
 
     // if this is a keypress, check that it is the enter key
     if (event.type === "keypress") {
@@ -745,11 +772,16 @@ class MateriaJS {
       // if it is the enter key...
       if (key === 13) {
         // .. then we treat it like a click
-        eventArr = this.#delegate.click;
+        eventArr = eventArr.concat(this.#delegate["click"]);
       }
-    } else {
-      // otherwise, just get the matching event object
-      eventArr = this.#delegate[event.type];
+    }
+
+    // if this is a keydown event, we need to check for the specific key event too
+    if (event.type === "keydown") {
+      let key = event.key;
+
+      // add the keydown event to the eventArr
+      eventArr = eventArr.concat(this.#delegate["keydown:" + key]);
     }
 
     for (const eventObj of eventArr) {
@@ -966,7 +998,7 @@ class MateriaJS {
       // because mutations are handled below by our mutationObserver
       if (!this.#isValidMutation(event)) {
         // then add a new event listener for that event
-        document.addEventListener(event, this.#eventHandler.bind(this), false);
+        this.#createEventListener(event);
       } else if (!this.#observingMutations) {
         // then we need to start observing mutations
         this.#observeMutations();
@@ -1078,7 +1110,11 @@ class MateriaJS {
     Object.keys(template).forEach((key) => {
       let value = template[key];
 
-      if (this.#eventTypes.includes(key) || key.startsWith("attributes:")) {
+      if (
+        this.#eventTypes.includes(key) ||
+        key.startsWith("attributes:") ||
+        key.startsWith("keydown:")
+      ) {
         // check to see if the default should be prevented
         const preventDefault = preventDefaults.includes(key);
 

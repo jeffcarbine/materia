@@ -66,7 +66,8 @@ export class Element {
       if (
         validProps.includes(key) ||
         key.startsWith("data-") ||
-        key.startsWith("attributes:")
+        key.startsWith("attributes:") ||
+        key.startsWith("keydown:")
       ) {
         this[key] = params[key];
       }
