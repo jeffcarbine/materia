@@ -54,6 +54,9 @@ class MateriaJS {
 
       this.#enableEventDelegation();
       this.#observeViewportClassElements();
+
+      // Add all pipes to the unplumbed list and schedule idle plumbing
+      this.#initializeUnplumbedPipes();
     }
   }
 
@@ -361,6 +364,9 @@ class MateriaJS {
    * @returns {void}
    */
   #setElementAttribute(element, key, value, depth = 0) {
+    // there is no element in the DOM to set this value to
+    if (!element) return;
+
     if (key === "style") {
       this.#setStyle(element, value);
     } else if (validAttributes.includes(key) || key.startsWith("data-")) {
@@ -550,6 +556,69 @@ class MateriaJS {
     return pipe;
   }
 
+  #unplumbedPipes = [];
+
+  // Method to initialize unplumbed pipes
+  #initializeUnplumbedPipes() {
+    // Iterate through handlers and add pipes to the unplumbed list
+    for (const binding in this.#handlers) {
+      this.#handlers[binding].forEach((handler) => {
+        if (handler.pipe) {
+          this.addUnplumbedPipe(handler.pipe);
+        }
+      });
+    }
+
+    // Iterate through delegates and add pipes to the unplumbed list
+    for (const event in this.#delegate) {
+      this.#delegate[event].forEach((delegate) => {
+        if (delegate.pipe) {
+          this.addUnplumbedPipe(delegate.pipe);
+        }
+      });
+    }
+
+    // Schedule idle plumbing
+    this.scheduleIdlePlumbing();
+  }
+
+  // Method to add unplumbed pipes to the list
+  addUnplumbedPipe(pipe) {
+    this.#unplumbedPipes.push(pipe);
+  }
+
+  // Method to schedule idle plumbing
+  scheduleIdlePlumbing() {
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(this.processUnplumbedPipes.bind(this));
+    } else {
+      // Fallback for browsers that do not support requestIdleCallback
+      setTimeout(this.processUnplumbedPipes.bind(this), 100);
+    }
+  }
+
+  // Method to process unplumbed pipes during idle times
+  processUnplumbedPipes(deadline) {
+    while (
+      this.#unplumbedPipes.length > 0 &&
+      (deadline.timeRemaining() > 0 || deadline.didTimeout)
+    ) {
+      const pipe = this.#unplumbedPipes.shift();
+      this.#plumb(pipe).catch((error) => {
+        console.error("Error plumbing pipe:", error);
+        // Optionally, re-add the pipe to the list for retry
+        this.#unplumbedPipes.push(pipe);
+      });
+    }
+
+    // If there are still unplumbed pipes, schedule the next idle callback
+    if (this.#unplumbedPipes.length > 0) {
+      this.scheduleIdlePlumbing();
+    }
+  }
+
+  #importCache = {};
+
   async #plumb(pipe) {
     for (let key in pipe) {
       if (typeof pipe[key] === "string") {
@@ -557,18 +626,21 @@ class MateriaJS {
           const path = pipe[key].replace("import::", "");
 
           // Check if the component is already imported
-          if (this.importedComponents[path]) {
-            pipe[key] = this.importedComponents[path];
+          if (this.#importCache[path]) {
+            pipe[key] =
+              this.#importCache[path][key] || this.#importCache[path].default;
           } else {
             try {
               // Dynamically import the component
               const module = await import(path);
 
+              // Cache the imported module
+              this.#importCache[path] = module;
+
               // Check for named export or default export
               const component = module[key] || module.default;
 
               if (component) {
-                this.importedComponents[path] = component;
                 pipe[key] = component;
               } else {
                 console.error(`Component ${key} not found in ${path}`);
@@ -583,6 +655,7 @@ class MateriaJS {
         }
       }
     }
+
     return pipe;
   }
 
@@ -1266,7 +1339,7 @@ class MateriaJS {
       for (const key in pipe) {
         const value = pipe[key];
 
-        if (typeof value === "object" && value.data && value.path) {
+        if (value && typeof value === "object" && value?.data && value?.path) {
           // assign the data to the clientPipe
           clientPipe[key] = value.data;
         } else {
@@ -1298,7 +1371,12 @@ class MateriaJS {
         for (const key in pipe) {
           const value = pipe[key];
 
-          if (typeof value === "object" && value.data && value.path) {
+          if (
+            value &&
+            typeof value === "object" &&
+            value?.data &&
+            value?.path
+          ) {
             // assign the data to the clientPipe
             pipe[key] = value.path;
           } else {
