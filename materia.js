@@ -778,10 +778,10 @@ class MateriaJS {
     if (this.#delegate[event] === undefined) {
       // if it doesn't, then set that delegate event to an empty array
       this.#delegate[event] = [];
-    }
 
-    if (!isServer) {
-      this.#createEventListener(event);
+      if (!isServer) {
+        this.#createEventListener(event);
+      }
     }
 
     // check to see if the pipe has any path values that need to be promoted
@@ -1267,6 +1267,11 @@ class MateriaJS {
         return element;
       }
     }
+
+    // if this is not the server, collect garbage
+    if (!isServer) {
+      this.#garbageCollect();
+    }
   }
 
   /**
@@ -1574,6 +1579,40 @@ class MateriaJS {
 
       // Call the async function
       asyncDestroy();
+    }
+  }
+
+  #garbageCollect() {
+    // review all the elements in the handlers and delegates
+    // and remove any that are no longer in the DOM
+    for (const binding in this.#handlers) {
+      this.#handlers[binding] = this.#handlers[binding].filter((handler) => {
+        let handlerElement = handler.element;
+        if (typeof handlerElement === "string") {
+          handlerElement = document.querySelector(
+            `[data-handler-id="${handlerElement}"]`
+          );
+        }
+        if (!handlerElement || !document.body.contains(handlerElement)) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    for (const event in this.#delegate) {
+      this.#delegate[event] = this.#delegate[event].filter((delegate) => {
+        let delegateTarget = delegate.target;
+        if (typeof delegateTarget === "string") {
+          delegateTarget = document.querySelector(
+            `[data-delegate-id="${delegateTarget}"]`
+          );
+        }
+        if (!delegateTarget || !document.body.contains(delegateTarget)) {
+          return false;
+        }
+        return true;
+      });
     }
   }
 }
