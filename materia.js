@@ -75,24 +75,26 @@ class MateriaJS {
     let defaultType = "";
 
     const value = binding
-      .split(/[\.\[\]]/)
-      .filter(Boolean)
+      .split(/[\.\[\]]/) // Split the binding string into parts
+      .filter(Boolean) // Remove empty parts
       .reduce((acc, part) => {
         if (acc === null || acc === undefined) {
-          return defaultType;
+          return defaultType; // Stop traversal if parent is null/undefined
         }
 
-        const arrayMatch = part.match(/(\d+)/);
+        // Check if the part is an array index
+        const arrayMatch = part.match(/^\d+$/);
         if (arrayMatch) {
-          const index = arrayMatch[0];
-          if (!acc || acc[index] === undefined) {
-            return defaultType;
+          const index = parseInt(part, 10); // Convert index to a number
+          if (!Array.isArray(acc) || acc[index] === undefined) {
+            return defaultType; // Return default if index is invalid
           }
           return acc[index];
         }
 
+        // Handle object keys
         if (acc[part] === undefined) {
-          return defaultType;
+          return defaultType; // Return default if key is missing
         }
         return acc[part];
       }, this.#data);
@@ -212,6 +214,7 @@ class MateriaJS {
 
     if (Array.isArray(target)) {
       target.push(value);
+
       this.#handleBindingUpdate(binding);
     } else {
       console.error(`Error: ${binding} is not an array.`);
@@ -1443,7 +1446,6 @@ class MateriaJS {
       `;
 
       script.setAttribute("type", "module");
-      script.setAttribute("defer", true);
 
       const body = element.querySelector("body");
       const scripts = body.querySelectorAll("script");
