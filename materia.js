@@ -45,11 +45,12 @@ class MateriaJS {
   constructor(params) {
     if (!isServer) {
       // Get the data and handlers from the params
-      const { data, handlers, delegate } = params;
+      const { data, handlers, triggers, delegate } = params;
 
       // Set the data and handlers
       this.#data = data;
       this.#handlers = handlers;
+      this.#triggers = triggers;
       this.#delegate = delegate;
 
       this.#enableEventDelegation();
@@ -64,6 +65,11 @@ class MateriaJS {
    * The handlers object for the template engine.
    */
   #handlers = {};
+
+  /**
+   * The triggers object for the template engine.
+   */
+  #triggers = {};
 
   /**
    * Gets the value from a binding string
@@ -307,8 +313,19 @@ class MateriaJS {
       }
     };
 
+    const checkTriggers = async (binding) => {
+      if (this.#triggers[binding]) {
+        for (const trigger of this.#triggers[binding]) {
+          const { binding, handler } = trigger;
+
+          this.#handle(binding, handler);
+        }
+      }
+    };
+
     if (!isServer) {
       checkHandlers(binding);
+      checkTriggers(binding);
     }
   }
 
@@ -336,6 +353,7 @@ class MateriaJS {
     return {
       data: this.#data,
       handlers: this.#handlers,
+      triggers: this.#triggers,
       delegate: this.#delegate,
     };
   }
@@ -1208,10 +1226,11 @@ class MateriaJS {
           value = this.#parseStringifiedFunction(value);
         }
 
-        let binding = template.binding;
-
         // If the value is a function and the key isn't an event, it's a binding
         if (typeof value === "function" && !this.#eventTypes.includes(key)) {
+          let binding = template.binding;
+          let triggers = template.triggers || [];
+
           // if the binding is undefined, we need to alert the user and continue the render
           if (!binding) {
             // console.error(
@@ -1224,6 +1243,7 @@ class MateriaJS {
               value,
               { ...pipe },
               binding,
+              triggers,
               depth
             );
           }
@@ -1334,7 +1354,15 @@ class MateriaJS {
    * @param {number} depth - The depth of the rendering.
    * @returns {void}
    */
-  #processFunctionValue(element, property, func, pipe, binding, depth) {
+  #processFunctionValue(
+    element,
+    property,
+    func,
+    pipe,
+    binding,
+    triggers,
+    depth
+  ) {
     let handlerElement,
       preservedFunc = func;
 
@@ -1403,6 +1431,24 @@ class MateriaJS {
       pipe,
     });
 
+    // get the index of the binding in the handler's array
+    const index = this.#handlers[binding].length - 1;
+
+    if (triggers.length > 0) {
+      triggers.forEach((trigger) => {
+        const triggerBinding = `${binding}.${trigger}`;
+
+        if (!this.#triggers[triggerBinding]) {
+          this.#triggers[triggerBinding] = [];
+        }
+
+        this.#triggers[triggerBinding].push({
+          binding,
+          handler: this.#handlers[binding][index],
+        });
+      });
+    }
+
     const result = preservedFunc(this.get(binding), elements, clientPipe);
 
     if (result !== null) {
@@ -1437,10 +1483,12 @@ class MateriaJS {
         const data = JSON.parse("${this.#stringifyObject(this.#data)}");
           
         const handlers = JSON.parse("${this.#stringifyObject(this.#handlers)}");
+
+        const triggers = JSON.parse("${this.#stringifyObject(this.#triggers)}");
           
         const delegate = JSON.parse("${this.#stringifyObject(this.#delegate)}");
           
-        window.Materia = new MateriaJS({data, handlers, delegate});
+        window.Materia = new MateriaJS({data, handlers, triggers, delegate});
 
         Materia.loadHandler();
       `;

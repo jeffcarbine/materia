@@ -493,6 +493,7 @@ export const validMateriaProps = [
   "textContent",
   "innerHTML",
   "binding",
+  "triggers",
   "components",
   "pipe",
   "preventDefault",
