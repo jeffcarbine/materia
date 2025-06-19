@@ -401,7 +401,7 @@ class MateriaJS {
    * @returns {string} The unique ID.
    */
   #generateUniqueId() {
-    return "objk" + Math.random().toString(36).substr(2, 9);
+    return "mtrid" + Math.random().toString(36).substr(2, 9);
   }
 
   /**
