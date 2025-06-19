@@ -1343,26 +1343,35 @@ class MateriaJS {
       if (this.#stashedLoadEvent) {
         const { target, func, pipe } = this.#stashedLoadEvent;
 
-        // we can only run this once the element has been appended to the body, so we need to wait
-        // until we can detect that the target has a parentNode of some kind
         const maxWaitTime = 5000; // Maximum wait time in milliseconds
         const intervalTime = 10; // Interval time in milliseconds
         let elapsedTime = 0;
+        let interval;
 
-        const interval = setInterval(() => {
-          if (target.parentNode) {
-            func(target, pipe, elements);
-            clearInterval(interval);
-          } else {
-            elapsedTime += intervalTime;
-            if (elapsedTime >= maxWaitTime) {
-              console.warn(
-                `Giving up after ${maxWaitTime}ms: target element not found in DOM.`
-              );
+        try {
+          interval = setInterval(() => {
+            try {
+              if (target.parentNode) {
+                func(target, pipe, elements);
+                clearInterval(interval);
+              } else {
+                elapsedTime += intervalTime;
+                if (elapsedTime >= maxWaitTime) {
+                  console.warn(
+                    `Giving up after ${maxWaitTime}ms: target element not found in DOM.`
+                  );
+                  clearInterval(interval);
+                }
+              }
+            } catch (err) {
               clearInterval(interval);
+              throw err;
             }
-          }
-        }, intervalTime);
+          }, intervalTime);
+        } finally {
+          // Defensive: ensure interval is cleared if function exits unexpectedly
+          setTimeout(() => clearInterval(interval), maxWaitTime + intervalTime);
+        }
       }
       // handle client-side rendering
       if (callbackOrQuery) {
