@@ -823,88 +823,98 @@ class MateriaJS {
   #eventTypes = [...validEvents, ...validMutations];
 
   /**
-   * Adds an event delegate for an element.
-   * Consolidates listeners to avoid redundant checks.
-   * @param {Element} element - The element to add the event delegate to.
-   * @param {string} event - The event to add the delegate for.
-   * @param {Function} func - The function to run when the event is triggered.
-   * @param {Object} pipe - The pipe object for additional data.
-   * @param {boolean} preventDefault - Whether to prevent the default behavior of the event.
+   * Adds an event delegate for an element
+   * @param {Element} element - The element to add the event delegate to
+   * @param {string} event - The event to add the delegate for
+   * @param {Function} func - The function to run when the event is triggered
    */
   #addEventDelegate(element, event, func, pipe, preventDefault) {
-    // Normalize the target for server-side or special events
+    // first, we need to check what kind of event is being registered
+    // -- if it is a load or resize function that are being set to the
+    // window, then they need to be handled differently and just get
+    // pushed to their corresponding arrays
     let target = element;
+
     if (isServer) {
       target = element.dataset.delegateId;
+    }
+
+    if (isServer) {
       func = this.#stringifyFunction(func);
     }
+
+    // if the event is clickOutside, we need to modify the event to click
+    // and the target to the document
     if (event === "clickOutside") {
       event = "click";
       target = "document";
     }
 
-    // Register the event only if it hasn't been registered yet
-    if (!this.#delegate[event]) {
+    this.#registerEvent(event, target, pipe, func, preventDefault);
+  }
+
+  #createEventListener(event) {
+    // Add a new event listener for that event
+    if (event.includes("keydown:")) {
+      // this is a special keydown event
+      const key = event.replace("keydown:", "");
+
+      // add an event listener for that specific key
+      document.addEventListener("keydown", (e) => {
+        if (e.key === key) {
+          this.#eventHandler(e);
+        }
+      });
+    } else {
+      document.addEventListener(event, this.#eventHandler.bind(this), false);
+    }
+  }
+
+  /**
+   * Registers an event for an element
+   * @param {string} event - The event to register
+   * @param {Element} target - The target element to register the event for
+   * @param {Function} func - The function to run when the event is triggered
+   * @param {boolean} preventDefault - Whether to prevent the default behavior of the event
+   */
+  #registerEvent(event, target, pipe, func, preventDefault) {
+    // check to see if the object already has an instance of the event (which, if it does, it means we have already
+    // registered an Event Listener for it)
+    if (this.#delegate[event] === undefined) {
+      // if it doesn't, then set that delegate event to an empty array
       this.#delegate[event] = [];
+
       if (!isServer) {
         this.#createEventListener(event);
       }
     }
 
-    // Add the delegate data
-    const eventData = { target, func, pipe, preventDefault };
-    if (
-      !this.#delegate[event].some((existing) =>
-        this.#isDuplicateDelegate(existing, eventData)
-      )
-    ) {
-      this.#delegate[event].push(eventData);
-    }
-  }
-
-  /**
-   * Checks if a delegate is a duplicate.
-   * @param {Object} existing - The existing delegate data.
-   * @param {Object} newDelegate - The new delegate data.
-   * @returns {boolean} True if the delegate is a duplicate, false otherwise.
-   */
-  #isDuplicateDelegate(existing, newDelegate) {
-    return (
-      existing.target === newDelegate.target &&
-      existing.func.toString() === newDelegate.func.toString() &&
-      JSON.stringify(existing.pipe) === JSON.stringify(newDelegate.pipe) &&
-      existing.preventDefault === newDelegate.preventDefault
-    );
-  }
-
-  #eventListenerRefs = {};
-
-  /**
-   * Creates an event listener for the document.
-   * Ensures only one listener is added per event type.
-   * @param {string} event - The event type to register.
-   */
-  #createEventListener(event) {
-    if (!this.#delegate[event]) {
-      this.#delegate[event] = [];
-    }
-
-    if (!this.#delegate[event].listenerAdded) {
-      if (event.includes("keydown:")) {
-        const key = event.replace("keydown:", "");
-        const handler = (e) => {
-          if (e.key === key) {
-            this.#eventHandler(e);
-          }
-        };
-        document.addEventListener("keydown", handler);
-        this.#eventListenerRefs[event] = handler;
-      } else {
-        const handler = this.#eventHandler.bind(this);
-        document.addEventListener(event, handler, false);
-        this.#eventListenerRefs[event] = handler;
+    // check to see if the pipe has any path values that need to be promoted
+    if (pipe) {
+      for (let key in pipe) {
+        if (typeof pipe[key] === "object" && pipe[key].path) {
+          pipe[key] = pipe[key].path;
+        }
       }
-      this.#delegate[event].listenerAdded = true;
+    }
+
+    const eventData = {
+      target,
+      func,
+      pipe,
+      preventDefault,
+    };
+
+    if (func.name !== undefined) {
+      eventData.name = func.name;
+    }
+
+    if (event === "load" && !isServer) {
+      // then we need to run this function immediately
+      // because we are rendering on the client side
+      this.#stashedLoadEvent = eventData;
+    } else {
+      this.#delegate[event].push(eventData);
     }
   }
 
@@ -1725,29 +1735,6 @@ class MateriaJS {
             }
             return true;
           });
-
-          // If no more delegates for this event, remove the listener
-          if (
-            Array.isArray(this.#delegate[event]) &&
-            this.#delegate[event].length === 0 &&
-            this.#delegate[event].listenerAdded &&
-            this.#eventListenerRefs[event]
-          ) {
-            if (event.startsWith("keydown:")) {
-              document.removeEventListener(
-                "keydown",
-                this.#eventListenerRefs[event]
-              );
-            } else {
-              document.removeEventListener(
-                event,
-                this.#eventListenerRefs[event],
-                false
-              );
-            }
-            delete this.#eventListenerRefs[event];
-            delete this.#delegate[event].listenerAdded;
-          }
         }
 
         // Remove the element from the DOM
