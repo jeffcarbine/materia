@@ -862,6 +862,8 @@ class MateriaJS {
     );
   }
 
+  #eventListenerRefs = {};
+
   /**
    * Creates an event listener for the document.
    * Ensures only one listener is added per event type.
@@ -875,13 +877,17 @@ class MateriaJS {
     if (!this.#delegate[event].listenerAdded) {
       if (event.includes("keydown:")) {
         const key = event.replace("keydown:", "");
-        document.addEventListener("keydown", (e) => {
+        const handler = (e) => {
           if (e.key === key) {
             this.#eventHandler(e);
           }
-        });
+        };
+        document.addEventListener("keydown", handler);
+        this.#eventListenerRefs[event] = handler;
       } else {
-        document.addEventListener(event, this.#eventHandler.bind(this), false);
+        const handler = this.#eventHandler.bind(this);
+        document.addEventListener(event, handler, false);
+        this.#eventListenerRefs[event] = handler;
       }
       this.#delegate[event].listenerAdded = true;
     }
@@ -1684,6 +1690,29 @@ class MateriaJS {
             }
             return true;
           });
+
+          // If no more delegates for this event, remove the listener
+          if (
+            Array.isArray(this.#delegate[event]) &&
+            this.#delegate[event].length === 0 &&
+            this.#delegate[event].listenerAdded &&
+            this.#eventListenerRefs[event]
+          ) {
+            if (event.startsWith("keydown:")) {
+              document.removeEventListener(
+                "keydown",
+                this.#eventListenerRefs[event]
+              );
+            } else {
+              document.removeEventListener(
+                event,
+                this.#eventListenerRefs[event],
+                false
+              );
+            }
+            delete this.#eventListenerRefs[event];
+            delete this.#delegate[event].listenerAdded;
+          }
         }
 
         // Remove the element from the DOM
