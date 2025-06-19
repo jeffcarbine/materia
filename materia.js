@@ -23,6 +23,8 @@ if (isServer) {
     })
     .catch((err) => {
       console.error("Failed to load modules:", err);
+      document = null; // Fallback: Set document to null
+      fs = null; // Fallback: Set fs to null
     });
 } else {
   document = window.document;
@@ -668,11 +670,17 @@ class MateriaJS {
               }
             } catch (error) {
               console.error(`Error importing ${path}:`, error);
+              pipe[key] = null; // Fallback: Set pipe[key] to null
             }
           }
         } else if (this.#isStringifiedFunction(pipe[key])) {
-          const func = this.#parseStringifiedFunction(pipe[key]);
-          pipe[key] = func;
+          try {
+            const func = this.#parseStringifiedFunction(pipe[key]);
+            pipe[key] = func;
+          } catch (error) {
+            console.error("Error parsing stringified function:", error);
+            pipe[key] = null; // Fallback: Set pipe[key] to null
+          }
         }
       }
     }
@@ -856,72 +864,79 @@ class MateriaJS {
    * @param {Event} event - The event to handle
    */
   async #eventHandler(event) {
-    // empty eventObj so we can properly pass what
-    // delegate event we are going to match this event to
-    var eventArr = this.#delegate[event.type] || [];
+    try {
+      var eventArr = this.#delegate[event.type] || [];
 
-    // if this is a keypress, check that it is the enter key
-    if (event.type === "keypress") {
-      let key = event.which || event.keyCode;
-      // if it is the enter key...
-      if (key === 13) {
-        // .. then we treat it like a click
-        eventArr = eventArr.concat(this.#delegate["click"]);
-      }
-    }
-
-    // if this is a keydown event, we need to check for the specific key event too
-    if (event.type === "keydown") {
-      let key = event.key;
-
-      // add the keydown event to the eventArr
-      eventArr = eventArr.concat(this.#delegate["keydown:" + key]);
-    }
-
-    for (const eventObj of eventArr) {
-      let { target, func, pipe, preventDefault } = eventObj;
-
-      // if the target is a string, then we need to get the element
-      // and update the delegate
-      if (typeof target === "string") {
-        if (target === "document") {
-          target = document;
-        } else {
-          target = document.querySelector("[data-delegate-id=" + target + "]");
-        }
-
-        eventObj.target = target;
-      }
-
-      // if the function is a stringified function, we need to parse it
-      if (typeof func === "string") {
-        func = this.#parseStringifiedFunction(func);
-        eventObj.func = func;
-      }
-
-      // check whether the element or its direct parent match
-      // the key
-      let match = this.#getMatchingTarget(event, target);
-
-      // set the disabled bool
-      let disabled = false;
-
-      // if the #getMatchingTarget returned a node
-      if (match !== false) {
-        // stop events if the element is disabled
-        if (match.disabled === true) {
-          disabled = true;
-        }
-
-        // run the function and pass the target
-        if (!disabled) {
-          if (preventDefault) event.preventDefault();
-
-          if (pipe) pipe = await this.#plumb(pipe);
-
-          func(match, pipe, elements, event);
+      // if this is a keypress, check that it is the enter key
+      if (event.type === "keypress") {
+        let key = event.which || event.keyCode;
+        // if it is the enter key...
+        if (key === 13) {
+          // .. then we treat it like a click
+          eventArr = eventArr.concat(this.#delegate["click"]);
         }
       }
+
+      // if this is a keydown event, we need to check for the specific key event too
+      if (event.type === "keydown") {
+        let key = event.key;
+
+        // add the keydown event to the eventArr
+        eventArr = eventArr.concat(this.#delegate["keydown:" + key]);
+      }
+
+      for (const eventObj of eventArr) {
+        let { target, func, pipe, preventDefault } = eventObj;
+
+        // if the target is a string, then we need to get the element
+        // and update the delegate
+        if (typeof target === "string") {
+          if (target === "document") {
+            target = document;
+          } else {
+            target = document.querySelector(
+              "[data-delegate-id=" + target + "]"
+            );
+          }
+
+          eventObj.target = target;
+        }
+
+        // if the function is a stringified function, we need to parse it
+        if (typeof func === "string") {
+          func = this.#parseStringifiedFunction(func);
+          eventObj.func = func;
+        }
+
+        // check whether the element or its direct parent match
+        // the key
+        let match = this.#getMatchingTarget(event, target);
+
+        // set the disabled bool
+        let disabled = false;
+
+        // if the #getMatchingTarget returned a node
+        if (match !== false) {
+          // stop events if the element is disabled
+          if (match.disabled === true) {
+            disabled = true;
+          }
+
+          // run the function and pass the target
+          if (!disabled) {
+            if (preventDefault) event.preventDefault();
+
+            try {
+              if (pipe) pipe = await this.#plumb(pipe);
+              func(match, pipe, elements, event);
+            } catch (error) {
+              console.error("Error executing event handler:", error);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error handling event:", error);
     }
   }
 
