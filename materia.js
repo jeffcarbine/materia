@@ -401,7 +401,7 @@ class MateriaJS {
    * @returns {string} The unique ID.
    */
   #generateUniqueId() {
-    return "mtrid" + Math.random().toString(36).substr(2, 9);
+    return HANDLER_ID_PREFIX + Math.random().toString(36).substr(2, 9);
   }
 
   /**
@@ -607,8 +607,8 @@ class MateriaJS {
       if (typeof pipe[key] === "function") {
         pipe[key] = this.#stringifyFunction(pipe[key]);
       } else if (typeof pipe[key] === "object" && pipe[key] !== null) {
-        if (pipe[key].path && !pipe[key].path.startsWith("import::")) {
-          pipe[key].path = `import::${pipe[key].path}`;
+        if (pipe[key].path && !pipe[key].path.startsWith(IMPORT_PREFIX)) {
+          pipe[key].path = `${IMPORT_PREFIX}${pipe[key].path}`;
         }
       }
     }
@@ -710,8 +710,8 @@ class MateriaJS {
   async #resolvePipeImports(pipe) {
     for (let key in pipe) {
       if (typeof pipe[key] === "string") {
-        if (pipe[key].startsWith("import::")) {
-          let path = pipe[key].replace("import::", "");
+        if (pipe[key].startsWith(IMPORT_PREFIX)) {
+          let path = pipe[key].replace(IMPORT_PREFIX, "");
 
           // Sanitize the path before importing
           path = this.#sanitizePath(path);
@@ -756,7 +756,6 @@ class MateriaJS {
         }
       }
     }
-
     return pipe;
   }
 
@@ -1225,7 +1224,7 @@ class MateriaJS {
   #observeViewportClassElements() {
     // on page load, get all the elements that have a data-vclass property
     const vclassElements = document.querySelectorAll(
-      "[data-vclass]:not([data-vclass-observed=true]"
+      `[${DATA_VCLASS}]:not([${DATA_VCLASS_OBSERVED}]=true)`
     );
 
     // and then observe each one
@@ -1488,7 +1487,7 @@ class MateriaJS {
       // Always use a handlerId for reference
       if (!element.dataset.handlerId) {
         handlerElementId = this.#generateUniqueId();
-        element.setAttribute("data-handler-id", handlerElementId);
+        element.setAttribute(DATA_HANDLER_ID, handlerElementId);
       } else {
         handlerElementId = element.dataset.handlerId;
       }
@@ -1496,7 +1495,7 @@ class MateriaJS {
     } else {
       if (!element.dataset.handlerId) {
         handlerElementId = this.#generateUniqueId();
-        element.setAttribute("data-handler-id", handlerElementId);
+        element.setAttribute(DATA_HANDLER_ID, handlerElementId);
       } else {
         handlerElementId = element.dataset.handlerId;
       }
@@ -1573,10 +1572,10 @@ class MateriaJS {
    * @returns {string} The rendered HTML
    */
   #handleServerSideRendering(element) {
-    if (element.tagName === "HTML") {
-      const script = document.createElement("script");
+    if (element.tagName === HTML_TAG) {
+      const script = document.createElement(SCRIPT_TAG);
       script.textContent = `
-        const rootUrl = window.location.origin + "/materia.js";
+        const rootUrl = window.location.origin + "${DEFAULT_ROOT_URL}";
         const MateriaJS = (await import(rootUrl)).default;
 
         const data = JSON.parse("${this.#stringifyObject(this.#data)}");
@@ -1592,10 +1591,10 @@ class MateriaJS {
         Materia.loadHandler();
       `;
 
-      script.setAttribute("type", "module");
+      script.setAttribute("type", SCRIPT_TYPE_MODULE);
 
-      const body = element.querySelector("body");
-      const scripts = body.querySelectorAll("script");
+      const body = element.querySelector(BODY_TAG);
+      const scripts = body.querySelectorAll(SCRIPT_TAG);
       if (scripts.length > 0) {
         body.insertBefore(script, scripts[0]);
       } else {
@@ -1603,16 +1602,11 @@ class MateriaJS {
       }
 
       // add the import map
-      const head = element.querySelector("head");
+      const head = element.querySelector(HEAD_TAG);
       if (head) {
-        const importMap = document.createElement("script");
-        importMap.type = "importmap";
-        importMap.textContent = JSON.stringify({
-          imports: {
-            "materiajs/": "/materiajs/",
-            "@jeffcarbine/premmio/": "/node_modules/@jeffcarbine/premmio/",
-          },
-        });
+        const importMap = document.createElement(SCRIPT_TAG);
+        importMap.type = IMPORTMAP_TYPE;
+        importMap.textContent = JSON.stringify(DEFAULT_IMPORT_MAP);
         head.appendChild(importMap);
       }
     }
@@ -1640,7 +1634,7 @@ class MateriaJS {
         handlers[key] = handlers[key].filter((bind) => {
           if (!bind.element) return true;
           const el = document.querySelector(
-            `[data-handler-id="${bind.element}"]`
+            `[${DATA_HANDLER_ID}="${bind.element}"]`
           );
           return el !== child;
         });
@@ -1674,7 +1668,7 @@ class MateriaJS {
           // Remove element from DOM by handlerId
           if (bind.element) {
             const el = document.querySelector(
-              `[data-handler-id="${bind.element}"]`
+              `[${DATA_HANDLER_ID}="${bind.element}"]`
             );
             if (el && el.parentNode) {
               el.parentNode.removeChild(el);
@@ -1698,7 +1692,7 @@ class MateriaJS {
               const el =
                 typeof handlerElementId === "string"
                   ? document.querySelector(
-                      `[data-handler-id="${handlerElementId}"]`
+                      `[${DATA_HANDLER_ID}="${handlerElementId}"]`
                     )
                   : null;
               if (el === element || (el && element.contains(el))) {
@@ -1715,7 +1709,7 @@ class MateriaJS {
             let delegateTarget = delegate.target;
             if (typeof delegateTarget === "string") {
               delegateTarget = document.querySelector(
-                `[data-delegate-id="${delegateTarget}"]`
+                `[${DATA_DELEGATE_ID}="${delegateTarget}"]`
               );
             }
             if (
@@ -1778,7 +1772,7 @@ class MateriaJS {
         let handlerElement = handler.element;
         if (typeof handlerElement === "string") {
           handlerElement = document.querySelector(
-            `[data-handler-id="${handlerElement}"]`
+            `[${DATA_HANDLER_ID}="${handlerElement}"]`
           );
         }
         if (!handlerElement || !document.body.contains(handlerElement)) {
@@ -1793,7 +1787,7 @@ class MateriaJS {
         let delegateTarget = delegate.target;
         if (typeof delegateTarget === "string") {
           delegateTarget = document.querySelector(
-            `[data-delegate-id="${delegateTarget}"]`
+            `[${DATA_DELEGATE_ID}="${delegateTarget}"]`
           );
         }
         if (!delegateTarget || !document.body.contains(delegateTarget)) {
@@ -1825,5 +1819,26 @@ class MateriaJS {
     };
   }
 }
+
+// ===== Magic String Constants =====
+const IMPORT_PREFIX = "import::";
+const HANDLER_ID_PREFIX = "mtrid";
+const DATA_HANDLER_ID = "data-handler-id";
+const DATA_DELEGATE_ID = "data-delegate-id";
+const DATA_VCLASS = "data-vclass";
+const DATA_VCLASS_OBSERVED = "data-vclass-observed";
+const DEFAULT_IMPORT_MAP = {
+  imports: {
+    "materiajs/": "/materiajs/",
+    "@jeffcarbine/premmio/": "/node_modules/@jeffcarbine/premmio/",
+  },
+};
+const SCRIPT_TYPE_MODULE = "module";
+const HTML_TAG = "HTML";
+const BODY_TAG = "body";
+const HEAD_TAG = "head";
+const SCRIPT_TAG = "script";
+const IMPORTMAP_TYPE = "importmap";
+const DEFAULT_ROOT_URL = "/materia.js";
 
 export default MateriaJS;
