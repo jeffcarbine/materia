@@ -111,6 +111,18 @@ class MateriaJS {
   }
 
   set(binding, value) {
+    // Validate binding
+    if (typeof binding !== "string" || binding.trim() === "") {
+      console.error("Invalid binding: Binding must be a non-empty string.");
+      return;
+    }
+
+    // Validate value
+    if (value === undefined) {
+      console.error("Invalid value: Value cannot be undefined.");
+      return;
+    }
+
     // Split the binding string into individual keys
     const keys = binding.split(/[\.\[\]]/).filter(Boolean);
     let target = this.#data;
@@ -174,6 +186,18 @@ class MateriaJS {
    * @param {Object} data - The data object containing updates
    */
   update(binding, data) {
+    // Validate binding
+    if (typeof binding !== "string" || binding.trim() === "") {
+      console.error("Invalid binding: Binding must be a non-empty string.");
+      return;
+    }
+
+    // Validate data
+    if (typeof data !== "object" || data === null) {
+      console.error("Invalid data: Data must be a non-null object.");
+      return;
+    }
+
     const updateRecursive = (currentBinding, currentData) => {
       if (
         typeof currentData !== "object" ||
@@ -207,6 +231,18 @@ class MateriaJS {
    * @param {*} value - The value to push to the binding.
    */
   push(binding, value) {
+    // Validate binding
+    if (typeof binding !== "string" || binding.trim() === "") {
+      console.error("Invalid binding: Binding must be a non-empty string.");
+      return;
+    }
+
+    // Validate value
+    if (value === undefined) {
+      console.error("Invalid value: Value cannot be undefined.");
+      return;
+    }
+
     let target = this.get(binding);
 
     if (target === "") {
