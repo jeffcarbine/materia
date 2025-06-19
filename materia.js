@@ -1203,6 +1203,11 @@ class MateriaJS {
   }
 
   /**
+   * Map to track IntersectionObservers for elements.
+   */
+  #intersectionObservers = new Map();
+
+  /**
    * Observes elements with the data-vclass attribute and adds the specified class when they enter the viewport.
    */
   #observeViewportClassElements() {
@@ -1225,6 +1230,9 @@ class MateriaJS {
 
         vclassObserver.observe(element);
         element.dataset.vclassObserved = true;
+
+        // Track the observer for cleanup
+        this.#intersectionObservers.set(element, vclassObserver);
       }
     });
   }
@@ -1718,6 +1726,14 @@ class MateriaJS {
         // Remove the element from the DOM
         if (element.parentNode) {
           element.parentNode.removeChild(element);
+        }
+
+        // Disconnect IntersectionObserver if present for this element
+        const observer = this.#intersectionObservers.get(element);
+        if (observer) {
+          observer.unobserve(element);
+          observer.disconnect();
+          this.#intersectionObservers.delete(element);
         }
       };
 
