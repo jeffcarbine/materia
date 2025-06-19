@@ -74,6 +74,12 @@ class MateriaJS {
   #triggers = {};
 
   /**
+   * WeakMap to track element -> Set of handler IDs.
+   * This allows efficient lookup and cleanup of handlers when elements are removed.
+   */
+  #elementHandlerMap = new WeakMap();
+
+  /**
    * Gets the value from a binding string
    * @param {string} binding - The binding to get the value for.
    * @returns {*} The bindingValue of the specified binding.
@@ -462,7 +468,6 @@ class MateriaJS {
     if (booleanAttributes.includes(key) && value === false) {
       element.removeAttribute(key);
     } else {
-      element.removeAttribute(key);
       const hasUpperCase = /[A-Z]/.test(key);
       if (hasUpperCase) {
         element.setAttributeNS(null, key, value);
@@ -498,7 +503,6 @@ class MateriaJS {
    * @returns {void}
    */
   #setInnerHTML(element, value) {
-    element.innerHTML = "";
     element.innerHTML = value;
   }
 
@@ -695,7 +699,7 @@ class MateriaJS {
    * @returns {string|null} The sanitized path or null if invalid.
    */
   #sanitizePath(path) {
-    const allowedPrefixes = ["./", "../", "/"];
+    const allowedPrefixes = ["@", "./", "../", "/"];
     const isValid = allowedPrefixes.some((prefix) => path.startsWith(prefix));
 
     if (!isValid) {
@@ -704,7 +708,7 @@ class MateriaJS {
     }
 
     // Remove any potentially dangerous characters
-    return path.replace(/[^a-zA-Z0-9_\-./]/g, "");
+    return path.replace(/[^a-zA-Z0-9_\-./@]/g, "");
   }
 
   async #resolvePipeImports(pipe) {
@@ -1224,7 +1228,7 @@ class MateriaJS {
   #observeViewportClassElements() {
     // on page load, get all the elements that have a data-vclass property
     const vclassElements = document.querySelectorAll(
-      `[${DATA_VCLASS}]:not([${DATA_VCLASS_OBSERVED}]=true)`
+      `[${DATA_VCLASS}]:not([${DATA_VCLASS_OBSERVED}=true])`
     );
 
     // and then observe each one
@@ -1529,6 +1533,16 @@ class MateriaJS {
       pipe,
     });
 
+    // Track handlerId <-> element association for efficient cleanup
+    if (element) {
+      let handlerIds = this.#elementHandlerMap.get(element);
+      if (!handlerIds) {
+        handlerIds = new Set();
+        this.#elementHandlerMap.set(element, handlerIds);
+      }
+      handlerIds.add(handlerElementId);
+    }
+
     // get the index of the binding in the handler's array
     const index = this.#handlers[binding].length - 1;
 
@@ -1620,26 +1634,24 @@ class MateriaJS {
    * @returns {void}
    */
   #clearChildren(element) {
-    // we need to check this.handlers for any reference to any of the children that are being removed
-    // and remove their handlers
-    // get all the children
-    const children = element.childNodes,
-      handlers = this.#handlers;
+    // Use the WeakMap for efficient handler cleanup
+    const children = element.childNodes;
 
-    // the handlers contain a reference to the element in their element property,
-    // so we just need to match that element to the element that is being removed
     Array.from(children).forEach((child) => {
-      for (let key in handlers) {
-        // Remove by handlerId, not by reference
-        handlers[key] = handlers[key].filter((bind) => {
-          if (!bind.element) return true;
-          const el = document.querySelector(
-            `[${DATA_HANDLER_ID}="${bind.element}"]`
-          );
-          return el !== child;
-        });
+      // Remove handlers associated with this child
+      const handlerIds = this.#elementHandlerMap.get(child);
+      if (handlerIds) {
+        for (const handlerId of handlerIds) {
+          for (let key in this.#handlers) {
+            this.#handlers[key] = this.#handlers[key].filter(
+              (bind) => bind.element !== handlerId
+            );
+          }
+        }
+        // Remove the mapping for this child
+        this.#elementHandlerMap.delete(child);
       }
-      // then delete the child
+      // Remove the child from the DOM
       element.removeChild(child);
     });
   }
@@ -1682,25 +1694,18 @@ class MateriaJS {
     } else if (bindingOrElement instanceof Element) {
       const element = bindingOrElement;
 
-      // Define an async function to handle the asynchronous operations
       const asyncDestroy = async () => {
         // Remove any handlers connected to this element
-        for (const binding in this.#handlers) {
-          this.#handlers[binding] = this.#handlers[binding].filter(
-            (handler) => {
-              let handlerElementId = handler.element;
-              const el =
-                typeof handlerElementId === "string"
-                  ? document.querySelector(
-                      `[${DATA_HANDLER_ID}="${handlerElementId}"]`
-                    )
-                  : null;
-              if (el === element || (el && element.contains(el))) {
-                return false;
-              }
-              return true;
+        const handlerIds = this.#elementHandlerMap.get(element);
+        if (handlerIds) {
+          for (const handlerId of handlerIds) {
+            for (const binding in this.#handlers) {
+              this.#handlers[binding] = this.#handlers[binding].filter(
+                (handler) => handler.element !== handlerId
+              );
             }
-          );
+          }
+          this.#elementHandlerMap.delete(element);
         }
 
         // Remove any delegates connected to this element
@@ -1776,6 +1781,10 @@ class MateriaJS {
           );
         }
         if (!handlerElement || !document.body.contains(handlerElement)) {
+          // Clean up WeakMap entry if present
+          if (handlerElement) {
+            this.#elementHandlerMap.delete(handlerElement);
+          }
           return false;
         }
         return true;
