@@ -773,10 +773,11 @@ class MateriaJS {
 
     value = func(this.get(binding), elements, pipe);
 
+    // Always resolve element by handlerId
     if (typeof element === "string") {
       const query = "[data-handler-id='" + element + "']";
       element = document.querySelector(query);
-      handler.element = element;
+      handler.element = element ? element.dataset.handlerId : null;
     }
 
     // Check if the element is a DOM element and if it no longer exists
@@ -1444,7 +1445,7 @@ class MateriaJS {
     triggers,
     depth
   ) {
-    let handlerElement,
+    let handlerElementId,
       preservedFunc = func;
 
     let clientPipe = {};
@@ -1464,35 +1465,31 @@ class MateriaJS {
     }
 
     if (!isServer) {
-      handlerElement = element;
+      // Always use a handlerId for reference
+      if (!element.dataset.handlerId) {
+        handlerElementId = this.#generateUniqueId();
+        element.setAttribute("data-handler-id", handlerElementId);
+      } else {
+        handlerElementId = element.dataset.handlerId;
+      }
       pipe = clientPipe;
     } else {
-      // create a handlerId to serve in place of the element in the handlers object
-      // in the event the element doesn't already have one
       if (!element.dataset.handlerId) {
-        handlerElement = this.#generateUniqueId();
-
-        // give the handlerId to the element
-        element.setAttribute("data-handler-id", handlerElement);
+        handlerElementId = this.#generateUniqueId();
+        element.setAttribute("data-handler-id", handlerElementId);
       } else {
-        handlerElement = element.dataset.handlerId;
+        handlerElementId = element.dataset.handlerId;
       }
-
-      // convert the func to a string so we can store it on the server
       func = func.toString();
-
-      // loop through the keys of the pipe and set the value to the data attribute
       if (pipe) {
         for (const key in pipe) {
           const value = pipe[key];
-
           if (
             value &&
             typeof value === "object" &&
             value?.data &&
             value?.path
           ) {
-            // assign the data to the clientPipe
             pipe[key] = value.path;
           } else {
             pipe[key] = value;
@@ -1505,8 +1502,9 @@ class MateriaJS {
       this.#handlers[binding] = [];
     }
 
+    // Store only the handlerId, not the element reference
     this.#handlers[binding].push({
-      element: handlerElement,
+      element: handlerElementId,
       func,
       property,
       pipe,
@@ -1618,9 +1616,15 @@ class MateriaJS {
     // so we just need to match that element to the element that is being removed
     Array.from(children).forEach((child) => {
       for (let key in handlers) {
-        handlers[key] = handlers[key].filter((bind) => bind.element !== child);
+        // Remove by handlerId, not by reference
+        handlers[key] = handlers[key].filter((bind) => {
+          if (!bind.element) return true;
+          const el = document.querySelector(
+            `[data-handler-id="${bind.element}"]`
+          );
+          return el !== child;
+        });
       }
-
       // then delete the child
       element.removeChild(child);
     });
@@ -1647,8 +1651,14 @@ class MateriaJS {
       // Remove any elements bound to that binding
       if (this.#handlers[bindingOrElement]) {
         this.#handlers[bindingOrElement].forEach((bind) => {
-          if (bind.element && bind.element.parentNode) {
-            bind.element.parentNode.removeChild(bind.element);
+          // Remove element from DOM by handlerId
+          if (bind.element) {
+            const el = document.querySelector(
+              `[data-handler-id="${bind.element}"]`
+            );
+            if (el && el.parentNode) {
+              el.parentNode.removeChild(el);
+            }
           }
         });
       }
@@ -1664,16 +1674,14 @@ class MateriaJS {
         for (const binding in this.#handlers) {
           this.#handlers[binding] = this.#handlers[binding].filter(
             (handler) => {
-              let handlerElement = handler.element;
-              if (typeof handlerElement === "string") {
-                handlerElement = document.querySelector(
-                  `[data-handler-id="${handlerElement}"]`
-                );
-              }
-              if (
-                handlerElement === element ||
-                element.contains(handlerElement)
-              ) {
+              let handlerElementId = handler.element;
+              const el =
+                typeof handlerElementId === "string"
+                  ? document.querySelector(
+                      `[data-handler-id="${handlerElementId}"]`
+                    )
+                  : null;
+              if (el === element || (el && element.contains(el))) {
                 return false;
               }
               return true;
