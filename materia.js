@@ -1012,20 +1012,27 @@ class MateriaJS {
    * @param {MutationRecord[]} mutationsList - The list of mutations to process.
    */
   #mutationCallback(mutationsList) {
+    let significantChange = false;
+
     for (var i = 0; i < mutationsList.length; i++) {
       let mutation = mutationsList[i];
 
       if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
         this.#executeCheck(mutation);
+        significantChange = true;
       } else if (mutation.type === "attributes") {
         this.#executeCheck(mutation);
+        significantChange = true;
       } else if (mutation.type === "characterData") {
         this.#executeCheck(mutation);
+        significantChange = true;
       }
     }
 
-    // Trigger debounced garbage collection after processing mutations
-    this.#debouncedGarbageCollect();
+    // Trigger garbage collection only if significant changes occurred
+    if (significantChange) {
+      this.#debouncedGarbageCollect();
+    }
   }
 
   /**
@@ -1684,7 +1691,7 @@ class MateriaJS {
    */
   #debouncedGarbageCollect = this.#debounce(() => {
     this.#garbageCollect();
-  }, 100);
+  }, 500); // Increased debounce interval to 500ms
 
   /**
    * Debounce function to limit the rate at which a function can fire.
