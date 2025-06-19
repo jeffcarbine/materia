@@ -678,11 +678,36 @@ class MateriaJS {
 
   #importCache = {};
 
+  /**
+   * Validates and sanitizes a module path.
+   * @param {string} path - The module path to validate.
+   * @returns {string|null} The sanitized path or null if invalid.
+   */
+  #sanitizePath(path) {
+    const allowedPrefixes = ["./", "../", "/"];
+    const isValid = allowedPrefixes.some((prefix) => path.startsWith(prefix));
+
+    if (!isValid) {
+      console.error(`Invalid module path: ${path}`);
+      return null;
+    }
+
+    // Remove any potentially dangerous characters
+    return path.replace(/[^a-zA-Z0-9_\-./]/g, "");
+  }
+
   async #plumb(pipe) {
     for (let key in pipe) {
       if (typeof pipe[key] === "string") {
         if (pipe[key].startsWith("import::")) {
-          const path = pipe[key].replace("import::", "");
+          let path = pipe[key].replace("import::", "");
+
+          // Sanitize the path before importing
+          path = this.#sanitizePath(path);
+          if (!path) {
+            pipe[key] = null; // Set to null if the path is invalid
+            continue;
+          }
 
           // Check if the component is already imported
           if (this.#importCache[path]) {
