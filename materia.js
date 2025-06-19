@@ -658,6 +658,9 @@ class MateriaJS {
 
   // Method to process unplumbed pipes during idle times
   processUnplumbedPipes(deadline) {
+    // Track failed pipes to avoid infinite growth
+    const failedPipes = new WeakSet();
+
     while (
       this.#unplumbedPipes.length > 0 &&
       (deadline.timeRemaining() > 0 || deadline.didTimeout)
@@ -665,8 +668,16 @@ class MateriaJS {
       const pipe = this.#unplumbedPipes.shift();
       this.#plumb(pipe).catch((error) => {
         console.error("Error plumbing pipe:", error);
-        // Optionally, re-add the pipe to the list for retry
-        this.#unplumbedPipes.push(pipe);
+        // Only re-add if not already failed before
+        if (typeof pipe === "object" && pipe !== null) {
+          if (!failedPipes.has(pipe)) {
+            failedPipes.add(pipe);
+            this.#unplumbedPipes.push(pipe);
+          } else {
+            // Drop pipe after one retry to avoid infinite growth
+            console.warn("Dropping pipe after repeated failure:", pipe);
+          }
+        }
       });
     }
 
