@@ -58,8 +58,8 @@ class MateriaJS {
       this.#enableEventDelegation();
       this.#observeViewportClassElements();
 
-      // Add all pipes to the unplumbed list and schedule idle plumbing
-      this.#initializeUnplumbedPipes();
+      // Add all pipes to the unimported list and schedule idle pipe importing
+      this.#initializeUnimportedPipes();
     }
   }
 
@@ -615,64 +615,64 @@ class MateriaJS {
     return pipe;
   }
 
-  #unplumbedPipes = [];
+  #pendingPipeImports = [];
 
-  // Method to initialize unplumbed pipes
-  #initializeUnplumbedPipes() {
-    // Iterate through handlers and add pipes to the unplumbed list
+  // Method to initialize unimported pipes
+  #initializeUnimportedPipes() {
+    // Iterate through handlers and add pipes to the unimported list
     for (const binding in this.#handlers) {
       this.#handlers[binding].forEach((handler) => {
         if (handler.pipe) {
-          this.addUnplumbedPipe(handler.pipe);
+          this.addUnimportedPipe(handler.pipe);
         }
       });
     }
 
-    // Iterate through delegates and add pipes to the unplumbed list
+    // Iterate through delegates and add pipes to the unimported list
     for (const event in this.#delegate) {
       this.#delegate[event].forEach((delegate) => {
         if (delegate.pipe) {
-          this.addUnplumbedPipe(delegate.pipe);
+          this.addUnimportedPipe(delegate.pipe);
         }
       });
     }
 
-    // Schedule idle plumbing
-    this.scheduleIdlePlumbing();
+    // Schedule idle pipe importing
+    this.scheduleIdlePipeImports();
   }
 
-  // Method to add unplumbed pipes to the list
-  addUnplumbedPipe(pipe) {
-    this.#unplumbedPipes.push(pipe);
+  // Method to add unimported pipes to the list
+  addUnimportedPipe(pipe) {
+    this.#pendingPipeImports.push(pipe);
   }
 
-  // Method to schedule idle plumbing
-  scheduleIdlePlumbing() {
+  // Method to schedule idle pipe importing
+  scheduleIdlePipeImports() {
     if (typeof requestIdleCallback === "function") {
-      requestIdleCallback(this.processUnplumbedPipes.bind(this));
+      requestIdleCallback(this.processUnimportedPipes.bind(this));
     } else {
       // Fallback for browsers that do not support requestIdleCallback
-      setTimeout(this.processUnplumbedPipes.bind(this), 100);
+      setTimeout(this.processUnimportedPipes.bind(this), 100);
     }
   }
 
-  // Method to process unplumbed pipes during idle times
-  processUnplumbedPipes(deadline) {
+  // Method to process unimported pipes during idle times
+  processUnimportedPipes(deadline) {
     // Track failed pipes to avoid infinite growth
     const failedPipes = new WeakSet();
 
     while (
-      this.#unplumbedPipes.length > 0 &&
+      this.#pendingPipeImports.length > 0 &&
       (deadline.timeRemaining() > 0 || deadline.didTimeout)
     ) {
-      const pipe = this.#unplumbedPipes.shift();
-      this.#plumb(pipe).catch((error) => {
-        console.error("Error plumbing pipe:", error);
+      const pipe = this.#pendingPipeImports.shift();
+      this.#resolvePipeImports(pipe).catch((error) => {
+        console.error("Error importing pipe:", error);
         // Only re-add if not already failed before
         if (typeof pipe === "object" && pipe !== null) {
           if (!failedPipes.has(pipe)) {
             failedPipes.add(pipe);
-            this.#unplumbedPipes.push(pipe);
+            this.#pendingPipeImports.push(pipe);
           } else {
             // Drop pipe after one retry to avoid infinite growth
             console.warn("Dropping pipe after repeated failure:", pipe);
@@ -681,9 +681,9 @@ class MateriaJS {
       });
     }
 
-    // If there are still unplumbed pipes, schedule the next idle callback
-    if (this.#unplumbedPipes.length > 0) {
-      this.scheduleIdlePlumbing();
+    // If there are still unimported pipes, schedule the next idle callback
+    if (this.#pendingPipeImports.length > 0) {
+      this.scheduleIdlePipeImports();
     }
   }
 
@@ -707,7 +707,7 @@ class MateriaJS {
     return path.replace(/[^a-zA-Z0-9_\-./]/g, "");
   }
 
-  async #plumb(pipe) {
+  async #resolvePipeImports(pipe) {
     for (let key in pipe) {
       if (typeof pipe[key] === "string") {
         if (pipe[key].startsWith("import::")) {
@@ -779,7 +779,7 @@ class MateriaJS {
 
     // check to see if any of the pipe values are strings that need to be imported
     if (pipe) {
-      pipe = await this.#plumb(pipe);
+      pipe = await this.#resolvePipeImports(pipe);
     }
 
     value = func(this.get(binding), elements, pipe);
@@ -990,7 +990,7 @@ class MateriaJS {
             if (preventDefault) event.preventDefault();
 
             try {
-              if (pipe) pipe = await this.#plumb(pipe);
+              if (pipe) pipe = await this.#resolvePipeImports(pipe);
               func(match, pipe, elements, event);
             } catch (error) {
               console.error("Error executing event handler:", error);
@@ -1013,7 +1013,7 @@ class MateriaJS {
         let { target, func, pipe } = delegate;
 
         if (pipe) {
-          pipe = await this.#plumb(pipe);
+          pipe = await this.#resolvePipeImports(pipe);
         }
 
         if (typeof target === "string") {
@@ -1146,7 +1146,7 @@ class MateriaJS {
         let { func, target, pipe } = funcObj;
 
         if (pipe) {
-          pipe = await this.#plumb(pipe);
+          pipe = await this.#resolvePipeImports(pipe);
         }
 
         // if the target is a string, then we need to get the element
