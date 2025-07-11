@@ -272,6 +272,44 @@ class MateriaJS {
   }
 
   /**
+   * Pushes multiple values to a binding if it is an array.
+   * @param {string} binding - The binding to push the values to.
+   * @param {Array} values - The array of values to push.
+   */
+  pushMany(binding, values) {
+    // Validate binding
+    if (typeof binding !== "string" || binding.trim() === "") {
+      console.error("Invalid binding: Binding must be a non-empty string.");
+      return;
+    }
+
+    // Validate values
+    if (!Array.isArray(values)) {
+      console.error("Invalid values: Must be an array.");
+      return;
+    }
+
+    let target = this.get(binding);
+
+    if (target === "") {
+      target = [];
+      this.set(binding, target);
+    }
+
+    if (!target) {
+      console.error(`Error: binding ${binding} is not defined.`);
+      return;
+    }
+
+    if (Array.isArray(target)) {
+      target.push(...values);
+      this.#handleBindingUpdate(binding);
+    } else {
+      console.error(`Error: ${binding} is not an array.`);
+    }
+  }
+
+  /**
    * Finds a matching value in an array and updates it, or
    * adds the value to the array if it doesn't exist.
    */

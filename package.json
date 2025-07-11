@@ -1,6 +1,6 @@
 {
   "name": "materiajs",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "Server-side and client-side framework for building lightweight websites and apps",
   "type": "module",
   "exports": {

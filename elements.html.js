@@ -84,6 +84,16 @@ export class Element {
 
     (primitiveHandlers[this.tagName] || primitiveHandlers.default)(params);
   }
+
+  classList = {
+    add: (className) => {
+      if (!this.class) {
+        this.class = className;
+      } else if (!this.class.includes(className)) {
+        this.class += ` ${className}`;
+      }
+    },
+  };
 }
 
 export class Html extends Element {
