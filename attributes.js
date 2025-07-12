@@ -95,6 +95,7 @@ export const validAttributes = [
   "placeholder",
   "poster",
   "preload",
+  "property",
   "radiogroup",
   "readonly",
   "referrerpolicy",
