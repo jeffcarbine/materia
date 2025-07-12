@@ -43,6 +43,7 @@ export const validAttributes = [
   "draggable",
   "dropzone",
   "enctype",
+  "fetchpriority",
   "for",
   "form",
   "formaction",
