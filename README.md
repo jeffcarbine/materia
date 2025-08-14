@@ -726,17 +726,17 @@ const button = new Button({
 
 ### Preventing default
 
-Since Materia handles it's events via delegation, you can't preventDefault inside the anonymous function.
+Since Materia handles it's events via delegation, you can't preventDefault inside the anonymous function. By the time the anonymous function has run, the default can no longer be prevented.
 
 ```js
 const form = new Form({
   submit: (form, pipe, event) {
-    event.preventDefault(); // will not work
+    event.preventDefault(); // will not work, default will have already ocurred
   }
 })
 ```
 
-Instead, you can pass a preventDefault value to the element with either a string or an array of strings of the events you want to preven default on
+Instead, pass a preventDefault value to the element with either a string or an array of strings of the events you want to prevent default on.
 
 ```js
 const form = new Form({
@@ -754,7 +754,7 @@ const form2 = new Form({
   click: (form, pipe, event) => {
     // default is prevented here too
   },
-  mouseover: (form, pipe, event) => {
+  "keydown:Enter": (form, pipe, event) => {
     // default is not prevented here
   },
 });
