@@ -305,14 +305,24 @@ materia.set("test", {
 
 Then, instead of writing static values in your elements, you can define the binding on each element that needs data binding, and then access that data via the anonymous function.
 
+### Nested Bindings
+
+You can bind to specific nested properties within your data objects by using dot notation in your binding strings. This allows for more granular control over which elements update when specific parts of your data change.
+
+**Important notes about nested bindings:**
+
+1. You can bind to any nested property (e.g., `"test.class"`, `"user.profile.name"`, etc.)
+2. Updating a parent binding (e.g., `"test"`) will **not** automatically trigger child bindings (e.g., `"test.class"`)
+3. Child bindings must be updated directly, or you can manually trigger them using `run()` on the parent binding
+
 ```js
 const element = new Div({
-  binding: "test",
-  class: (test) => test.class,
+  binding: "test.class",
+  class: (class) => class,
   children: [
     new P({
-      binding: "test",
-      textContent: (test) => test.text,
+      binding: "test.text",
+      textContent: (text) => text,
     }),
     new Div({
       binding: "test",
