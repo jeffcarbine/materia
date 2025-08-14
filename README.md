@@ -468,9 +468,16 @@ materia.run("user.name");
 materia.run("user");
 ```
 
-### Updating the data
+### Manipulating the data
 
-To update the data, you can use the `materia.set()` or `materia.push()` methods.
+Materia has the following methods to manipulate its data:
+
+1. `set(binding, data)`
+2. `push(binding, data)`
+3. `pushMany(binding, data)`
+4. `setInArray(binding, query, data)`
+5. `update(binding, data)`
+6. `pull(binding, data)`
 
 ```js
 const materia = new MateriaJS();
@@ -530,7 +537,7 @@ materia.setInArray("users", { id: 3 }, { id: 3, name: "Bob", active: true });
 materia.pull("users", { id: 2 });
 ```
 
-Any element bound to the value being updated will be updated. However, if you have a binding that is more specific, that binding will run instead.
+Any element's property bound verbatim to the value being manipulated will have it's value updated.
 
 ```js
 materia.set("test", {
@@ -580,8 +587,10 @@ const element = new Div({
   ],
 });
 
-materia.set("test.name.first", "Joe"); // will conly cause the "test-name" bound element to re-render
-materia.set("test.class", "new-class"); // will cause the "test" bound elements to re-render
+materia.set("test.name.first", "Joe"); // will not cause the "test.name" binding to update since we are being more specific
+materia.update("test", {
+  class: "new-class"
+}); // will cause the "test" bound elements to update since we are modifying that binding
 ```
 
 ### Cleaning Up Data and Elements
