@@ -106,7 +106,12 @@ export default async (app) => {
 const renderView = async (view, _data, callback) => {
   const Materia = new MateriaJS();
 
-  const viewData = view.data;
+  const viewData = view.data || {};
+
+  if (_data.user) {
+    // we need to pass any user data to the viewData
+    viewData.user = _data.user;
+  }
 
   if (viewData) {
     if (typeof viewData === "object") {

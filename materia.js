@@ -1483,7 +1483,8 @@ class MateriaJS {
     if (typeof str !== "string") {
       return false;
     }
-    const functionPattern = /^\s*(function\s*\(|\(\s*[^\)]*\)\s*=>)/;
+    const functionPattern =
+      /^\s*(function\s*\(|\(\s*[^\)]*\)\s*=>|class\s+\w+)/;
     return functionPattern.test(str);
   }
 
