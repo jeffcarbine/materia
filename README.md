@@ -24,7 +24,7 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
     - [Client-side Pipe](#client-side-pipe)
     - [Server-side Pipe](#server-side-pipe)
   - [Managing the Data](#managing-the-data)
-  - [Updating the data](#updating-the-data)
+  - [Manipulating the data](#manipulating-the-data)
   - [Cleaning Up Data and Elements](#cleaning-up-data-and-elements)
 - [Viewport Classes](#viewport-classes)
 - [Events](#events)
