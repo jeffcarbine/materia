@@ -23,9 +23,14 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
   - [The Pipe](#the-pipe)
     - [Client-side Pipe](#client-side-pipe)
     - [Server-side Pipe](#server-side-pipe)
+  - [Managing the Data](#managing-the-data)
   - [Updating the data](#updating-the-data)
+  - [Cleaning Up Data and Elements](#cleaning-up-data-and-elements)
+- [Viewport Classes](#viewport-classes)
 - [Events](#events)
   - [Preventing Default](#preventing-default)
+  - [Special Event Types](#special-event-types)
+- [Debugging](#debugging)
 - [Contributing](#contributing)
 - [License](#license)
 - [Contact](#contact)
@@ -51,7 +56,7 @@ npm i materiajs
 To use Materia directly, import it into your project.
 
 ```js
-import materia from "materiajs";
+import MateriaJS from "materiajs";
 ```
 
 If you wish to use server-side rendering, import the engine into your project
@@ -61,7 +66,7 @@ import engine from "materiajs/engine";
 import express from "express";
 
 const app = express();
-engine(express);
+engine(app);
 ```
 
 ## Elements
@@ -177,35 +182,29 @@ Some elments have unique shorthands:
 
 ### Client-side Render
 
-To client-side render, import `materia` and call the `render()` method. `render()` takes in three parameters:
+To client-side render, import `MateriaJS` and call the `render()` method. `render()` takes in three parameters:
 
 - the object to render
-- the data to data-bind (optional)
-- either a target to append the rendered element to, or a callback function
+- a callback function or query selector string (optional)
+- the depth of rendering (optional)
 
 ```js
-import materia from "materiajs";
+import MateriaJS from "materiajs";
+
+const materia = new MateriaJS();
 
 // renders an element and runs a callback
-materia.create(new H1("Hello World"), (element) =>
+materia.render(new H1("Hello World"), (element) =>
   document.body.appendChild(element)
 );
-
-// renders an element with attached data and runs a callback
-materia.create(new H1("Hello World"), {foo: "bar"}, (element) =>
-  document.body.appendChild(element)
-);
-
-// renders an element with attached data and appends it to "body"
-materia.create(new H1("Hello World"), {foo: "bar"}, "body";
 
 // renders an element and appends it to "body"
-materia.create(new H1("Hello World"), "body";
+materia.render(new H1("Hello World"), "body");
 ```
 
 ## Server-side Render
 
-Materia can server-side rener your layouts. The filename extension that Materia looks for is `.html.js`.
+Materia can server-side render your layouts. The filename extension that Materia looks for is `.html.js`.
 
 To server-side render, import the engine
 
@@ -214,7 +213,7 @@ import engine from "materiajs/engine";
 import express from "express";
 
 const app = express();
-engine(express);
+engine(app);
 ```
 
 And then you can write your views using Materia with the extension of `.html.js`. Materia templates export a default function with a parameter of `data`, which contains the data being sent from the server.
@@ -284,31 +283,54 @@ app.get("/", (req, res) => {
 
 ## Data Binding
 
-Data-bind functions are anonymous functions that run anytime a bound piece of data is updated on `materia`.
+Data-bind functions are anonymous functions that run anytime a bound piece of data is updated on a MateriaJS instance.
 
-To data-bind, pass an anonymous function to an element's property. The anonymous function accepts three parameters:
+To data-bind, pass an anonymous function to an element's property. The anonymous function can accept up to three parameters:
 
-- The data being bound
-- The `materia/elements` library of elements
-- The piped data to the function
+- The data being bound (always available)
+- The `materiajs/elements` library of elements (optional, when you need access to Materia elements)
+- The piped data to the function (optional, when you need access to piped components/functions)
 
-To start, you need to add data to `materia.data` using the `.set()` method. The first parameter of the `set()` function is known as the `binding`.
+To start, you need to add data to a MateriaJS instance using the `.set()` method. The first parameter of the `set()` function is known as the `binding`.
 
 ```js
-materia.data.set("test", {
+const materia = new MateriaJS();
+
+materia.set("test", {
   class: "test-element",
   text: "This is a test of data-binding",
   children: ["one", "two", "three"],
 });
 ```
 
-Then, instead of writing static values in your data, you can define the binding, and then access that data via the anonymous function.
+Then, instead of writing static values in your elements, you can define the binding on each element that needs data binding, and then access that data via the anonymous function.
 
 ```js
 const element = new Div({
   binding: "test",
   class: (test) => test.class,
-  children: [new P((test) => test.text)],
+  children: [
+    new P({
+      binding: "test",
+      textContent: (test) => test.text,
+    }),
+    new Div({
+      binding: "test",
+      pipe: {
+        SomeComponent,
+      },
+      children: (test, elements, pipe) => {
+        const { Span } = elements;
+        const { SomeComponent } = pipe;
+
+        return test.children.map((item) => {
+          return new SomeComponent({
+            child: new Span(item),
+          });
+        });
+      },
+    }),
+  ],
 });
 ```
 
@@ -355,7 +377,7 @@ If you are server-side, you might need to pass additional data to the pipe.
 
 If the value you are piping is self-contained in the file, you can simply pipe directly to that data. If that data is imported from elsewhere, you will need to pass `data` and `path` values instead.
 
-The data is the reference to the data at time of render, and the path is the path to the file from the clieint-side so that the data can be imported at the time of re-render;
+The data is the reference to the data at time of render, and the path is the path to the file from the client-side so that the data can be imported at the time of re-render.
 
 ```js
 import { Component } from "./someComponent.html.js";
@@ -394,14 +416,60 @@ const element = new Div({
 });
 ```
 
+### Managing the Data
+
+#### Getting Data
+
+You can retrieve data from a MateriaJS instance using the `get()` method:
+
+```js
+const materia = new MateriaJS();
+
+materia.set("user", {
+  name: "John Doe",
+  settings: {
+    theme: "dark",
+    notifications: true,
+  },
+  friends: ["Alice", "Bob", "Charlie"],
+});
+
+// Get simple values
+const userName = materia.get("user.name"); // "John Doe"
+const theme = materia.get("user.settings.theme"); // "dark"
+
+// Get array values
+const firstFriend = materia.get("user.friends[0]"); // "Alice"
+const allFriends = materia.get("user.friends"); // ["Alice", "Bob", "Charlie"]
+
+// Get entire objects
+const userSettings = materia.get("user.settings"); // {theme: "dark", notifications: true}
+```
+
+#### Manually Running Bindings
+
+You can manually trigger a binding to re-render using the `run()` method:
+
+```js
+// This will cause all elements bound to "user.name" to re-render
+materia.run("user.name");
+
+// This will cause all elements bound to "user" to re-render
+materia.run("user");
+```
+
 ### Updating the data
 
 To update the data, you can use the `materia.set()` or `materia.push()` methods.
 
-`materia.set` allows you to push to any value of the data, assuming that data is set.
+```js
+const materia = new MateriaJS();
+```
+
+`materia.set` allows you to set any value of the data.
 
 ```js
-materia.push("test.class", "new-class");
+materia.set("test.class", "new-class");
 ```
 
 `materia.push` allows you to push to an array value within the data, assuming the value you are trying to push to is an array.
@@ -410,10 +478,52 @@ materia.push("test.class", "new-class");
 materia.push("test.children", "four");
 ```
 
+`materia.pushMany` allows you to push multiple values to an array at once.
+
+```js
+materia.pushMany("test.children", ["five", "six", "seven"]);
+```
+
+`materia.update` allows you to update multiple properties of an object at once without overwriting the entire object.
+
+```js
+materia.update("test", {
+  class: "updated-class",
+  text: "Updated text",
+});
+// This updates only the specified properties, leaving other properties intact
+```
+
+`materia.setInArray` finds a matching object in an array and updates it, or adds it if not found.
+
+```js
+materia.set("users", [
+  { id: 1, name: "John", active: true },
+  { id: 2, name: "Jane", active: false },
+]);
+
+// Update existing user
+materia.setInArray(
+  "users",
+  { id: 1 },
+  { id: 1, name: "John Doe", active: true }
+);
+
+// Add new user (since id: 3 doesn't exist)
+materia.setInArray("users", { id: 3 }, { id: 3, name: "Bob", active: true });
+```
+
+`materia.pull` removes a matching object from an array.
+
+```js
+// Remove user with id: 2
+materia.pull("users", { id: 2 });
+```
+
 Any element bound to the value being updated will be updated. However, if you have a binding that is more specific, that binding will run instead.
 
 ```js
-materia.data.set("test", {
+materia.set("test", {
   class: "test-element",
   text: "This is a test of data-binding",
   children: ["one", "two", "three"],
@@ -464,33 +574,133 @@ materia.set("test.name.first", "Joe"); // will conly cause the "test-name" bound
 materia.set("test.class", "new-class"); // will cause the "test" bound elements to re-render
 ```
 
+### Cleaning Up Data and Elements
+
+The `destroy()` method allows you to clean up data, handlers, and DOM elements. It can accept either a binding string or a DOM element.
+
+**Destroying by binding:**
+
+```js
+// Remove data and all associated elements for a binding
+materia.destroy("test.name");
+
+// This will:
+// - Delete the data at "test.name"
+// - Remove any DOM elements bound to "test.name"
+// - Clean up all handlers for "test.name"
+```
+
+**Destroying by element:**
+
+```js
+const element = document.querySelector(".some-element");
+
+// Remove element and clean up all associated handlers and delegates
+materia.destroy(element);
+
+// This will:
+// - Remove the element from the DOM
+// - Clean up all handlers connected to this element
+// - Remove any event delegates connected to this element
+// - Disconnect any IntersectionObservers for this element
+```
+
+The `destroy()` method is useful for:
+
+- Cleaning up when components are no longer needed
+- Preventing memory leaks by removing unused handlers
+- Dynamic content management where elements are frequently added/removed
+
+## Viewport Classes
+
+MateriaJS includes a built-in feature for automatically adding CSS classes when elements enter the viewport. This is useful for animations, lazy loading, or other viewport-based interactions.
+
+### Basic Usage
+
+Add a `data-vclass` attribute to any element with the class name you want to add when it enters the viewport:
+
+```js
+const element = new Div({
+  "data-vclass": "fade-in",
+  textContent: "This will get the 'fade-in' class when visible",
+});
+```
+
+When this element enters the viewport, MateriaJS will automatically add the `fade-in` class to the element's `className`.
+
+### Custom Root Margin
+
+You can control when the class is added by setting a custom root margin using `data-vclass-margin`:
+
+```js
+const element = new Div({
+  "data-vclass": "slide-up",
+  "data-vclass-margin": "50px", // Add class when element is 50px from entering viewport
+  textContent: "Animation triggers 50px early",
+});
+```
+
+### CSS Example
+
+```css
+/* Initial state - elements start invisible/offset */
+[data-vclass="fade-in"] {
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+/* Applied when element enters viewport */
+.fade-in {
+  opacity: 1;
+}
+
+/* Initial state - element starts below */
+[data-vclass="slide-up"] {
+  transform: translateY(20px);
+  transition: transform 0.3s ease-out;
+}
+
+/* Applied when element enters viewport */
+.slide-up {
+  transform: translateY(0);
+}
+```
+
+This feature uses the Intersection Observer API under the hood and automatically cleans up observers when elements are removed from the DOM.
+
 ## Events
 
 You can add event delegation to any element by passing an anonymous function to the event key name.
 
-The anonymous function accepts three parameters:
+The anonymous function accepts four parameters:
 
-- the element itself
+- the target element itself
 - the pipe
+- the elements library
 - the event
 
 ```js
+import { CustomComponent } from "./customComponent.html.js";
+
 const button = new Button({
   class: "submit",
   pipe: {
     CustomComponent: {
       data: CustomComponent,
-      path: "/path/to/custom/component",
+      path: "./customComponent.html.js",
     },
   },
-  click: (button, pipe, event) => {
+  click: (target, pipe, elements, event) => {
     const { CustomComponent } = pipe;
-
+    const { Div } = elements;
     const eventType = event.type;
 
-    Materia.render(CustomComponent(eventType), (element) => {
-      button.appendChild(element);
+    // Create a new element using the piped component and elements
+    const newElement = new Div({
+      children: [new CustomComponent({ eventType })],
     });
+
+    target.appendChild(newElement);
   },
 });
 ```
@@ -531,9 +741,83 @@ const form2 = new Form({
 });
 ```
 
+### Special Event Types
+
+MateriaJS supports several special event types for enhanced functionality:
+
+**`clickOutside`** - Triggers when clicking anywhere outside the element:
+
+```js
+const modal = new Div({
+  class: "modal",
+  clickOutside: (target, pipe, elements, event) => {
+    // Close modal when clicking outside
+    target.style.display = "none";
+  },
+  children: [
+    /* modal content */
+  ],
+});
+```
+
+**`keydown:` prefix** - Listen for specific key presses:
+
+```js
+const input = new Input({
+  "keydown:Enter": (target, pipe, elements, event) => {
+    // Handle Enter key press
+    console.log("Enter key pressed!");
+  },
+  "keydown:Escape": (target, pipe, elements, event) => {
+    // Handle Escape key press
+    target.blur();
+  },
+});
+```
+
+**Mutation events** - React to DOM changes:
+
+```js
+const container = new Div({
+  childList: (target, pipe, mutation) => {
+    // Triggered when child elements are added or removed
+    console.log("Children changed:", mutation);
+  },
+  "attributes:class": (target, pipe, mutation) => {
+    // Triggered when the class attribute changes
+    console.log("Class attribute changed:", mutation);
+  },
+});
+```
+
+Available mutation events:
+
+- `childList` - Child elements added/removed
+- `attributes` - Any attribute changed
+- `attributes:attributeName` - Specific attribute changed (e.g., `attributes:class`)
+- `characterData` - Text content changed
+
+## Debugging
+
+### Reviewing Current State
+
+You can inspect the current state of a MateriaJS instance using the `review()` method, which returns an object containing the current data, handlers, triggers, and delegates:
+
+```js
+const materia = new MateriaJS();
+
+materia.set("user", { name: "John", age: 30 });
+
+const state = materia.review();
+console.log(state.data); // Shows current data: {user: {name: "John", age: 30}}
+console.log(state.handlers); // Shows current binding handlers
+console.log(state.triggers); // Shows current triggers
+console.log(state.delegate); // Shows current event delegates
+```
+
 ## Contributing
 
-Contributions are welcome! If you have any ideas, suggestions, or bug reports, please open an issue on GitHub. If you would like to contribute code, you can do so by forking the repository and creating a pull request. Please ensure that your code follows the project's coding standards and includes appropriate tests.
+Contributions are welcome! If you have any ideas, suggestions, or bug reports, please open an issue on GitHub. If you would like to contribute code, you can do so by forking the repository and creating a pull request. Please ensure that your code follows the project's coding standards.
 
 To contribute:
 

@@ -30,10 +30,6 @@ if (isServer) {
   document = window.document;
 }
 
-export function Bind(callback) {
-  callback();
-}
-
 /**
  * The main MateriaJS class.
  * @class Materia
