@@ -20,6 +20,8 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
   - [Client-side Render](#client-side-render)
   - [Server-side Render](#server-side-render)
 - [Data Binding](#data-binding)
+  - [Nested Bindings](#nested-bindings)
+  - [Triggers](#triggers)
   - [The Pipe](#the-pipe)
     - [Client-side Pipe](#client-side-pipe)
     - [Server-side Pipe](#server-side-pipe)
@@ -343,6 +345,56 @@ const element = new Div({
   ],
 });
 ```
+
+### Triggers
+
+Triggers allow you to make binding handlers re-run when related data changes, even if the main binding itself hasn't changed. This is particularly useful when you want a binding to update based on changes to nested properties within the main binding's data.
+
+When you define triggers on an element, any changes to those trigger bindings will cause the element's main binding handler to re-execute. **Trigger paths are relative to the main binding** - they represent nested properties within the main binding's data structure. The trigger bindings themselves don't pass their data to the handler - the handler still receives data from its main binding.
+
+```js
+const materia = new MateriaJS();
+
+materia.set("user", {
+  profile: {
+    name: "John Doe",
+    email: "john@example.com",
+  },
+  settings: {
+    theme: "dark",
+    language: "en",
+  },
+});
+
+const userCard = new Div({
+  binding: "user",
+  triggers: ["profile.name", "settings.theme"], // These are relative to "user"
+  class: (user) => `user-card theme-${user.settings.theme}`,
+  children: (user) => [
+    new H2(user.profile.name),
+    new P(user.profile.email),
+    new Span(`Theme: ${user.settings.theme}`),
+  ],
+});
+
+// This will cause the userCard to re-render because "user.profile.name" matches the trigger "profile.name"
+materia.set("user.profile.name", "Jane Doe");
+
+// This will also cause the userCard to re-render because "user.settings.theme" matches the trigger "settings.theme"
+materia.set("user.settings.theme", "light");
+
+// This will NOT cause the userCard to re-render because "user.profile.email" doesn't match any triggers
+materia.set("user.profile.email", "jane@example.com");
+```
+
+**Key points about triggers:**
+
+- Triggers are defined as an array of binding strings in the `triggers` property
+- **Trigger paths are relative to the main binding** (e.g., `binding: "user"` with `triggers: ["profile.name"]` means changes to `"user.profile.name"` will trigger the handler)
+- When any trigger binding changes, the main binding's handler re-executes
+- The handler function still receives data from the main binding, not from the trigger bindings
+- Triggers are useful for making components reactive to nested property changes within the main binding's data
+- You can have multiple triggers on a single element
 
 ### The Pipe
 
