@@ -38,7 +38,6 @@ const handledata = async (Materia, key, data) => {
 };
 
 const viewCache = new Map();
-const registeredRoutes = new Set();
 
 export default async (app) => {
   app.engine("html.js", (filePath, data, callback) => {
@@ -106,12 +105,15 @@ export default async (app) => {
 const renderView = async (view, _data, callback) => {
   const Materia = new MateriaJS();
 
-  const viewData = view.data || {};
+  const viewData = { ...view.data } || {};
 
   if (_data.user) {
     // we need to pass any user data to the viewData
     viewData.user = _data.user;
   }
+
+  // and add all of the viewData to the _data under the materia key
+  _data.materia = {};
 
   if (viewData) {
     if (typeof viewData === "object") {
@@ -122,6 +124,9 @@ const renderView = async (view, _data, callback) => {
             : viewData[key];
 
         await handledata(Materia, key, data);
+
+        // and then set the data on the _data.materia object as well
+        _data.materia[key] = data;
 
         // if (endpoint) {
         //   if (typeof endpoint === "string") {
