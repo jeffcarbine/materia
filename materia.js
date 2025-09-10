@@ -268,6 +268,45 @@ class MateriaJS {
   }
 
   /**
+   * Unshifts a value to a binding if it is an array
+   * @param {string} binding - The binding to unshift the value to.
+   * @param {*} value - The value to unshift to the binding.
+   */
+  unshift(binding, value) {
+    // Validate binding
+    if (typeof binding !== "string" || binding.trim() === "") {
+      console.error("Invalid binding: Binding must be a non-empty string.");
+      return;
+    }
+
+    // Validate value
+    if (value === undefined) {
+      console.error("Invalid value: Value cannot be undefined.");
+      return;
+    }
+
+    let target = this.get(binding);
+
+    if (target === "") {
+      target = [];
+      // then we need to replace the null value with an empty array
+      this.set(binding, target);
+    }
+
+    if (!target) {
+      console.error(`Error: binding ${binding} is not defined.`);
+      return;
+    }
+
+    if (Array.isArray(target)) {
+      target.unshift(value);
+      this.#handleBindingUpdate(binding);
+    } else {
+      console.error(`Error: ${binding} is not an array.`);
+    }
+  }
+
+  /**
    * Pushes multiple values to a binding if it is an array.
    * @param {string} binding - The binding to push the values to.
    * @param {Array} values - The array of values to push.
@@ -803,7 +842,7 @@ class MateriaJS {
    * @param {Object} handler - The handler to process.
    */
   async #handle(binding, handler) {
-    let { element, func, property, pipe } = handler;
+    let { element, func, property, pipe, bindings } = handler;
 
     let value;
 
@@ -819,7 +858,20 @@ class MateriaJS {
       pipe = await this.#resolvePipeImports(pipe);
     }
 
-    value = func(this.get(binding), elements, pipe);
+    // Construct data based on whether this handler uses array bindings
+    let data;
+    if (bindings && bindings.length > 1) {
+      // Array binding - construct object with all bound values
+      data = {};
+      bindings.forEach((b) => {
+        data[b] = this.get(b);
+      });
+    } else {
+      // Single binding - use the binding value directly
+      data = this.get(binding);
+    }
+
+    value = func(data, elements, pipe);
 
     // Always resolve element by handlerId
     if (typeof element === "string") {
@@ -1566,16 +1618,22 @@ class MateriaJS {
       }
     }
 
-    if (!this.#handlers[binding]) {
-      this.#handlers[binding] = [];
-    }
+    // Handle array bindings by storing handlers under each individual binding
+    const bindingsArray = Array.isArray(binding) ? binding : [binding];
 
-    // Store only the handlerId, not the element reference
-    this.#handlers[binding].push({
-      element: handlerElementId,
-      func,
-      property,
-      pipe,
+    bindingsArray.forEach((singleBinding) => {
+      if (!this.#handlers[singleBinding]) {
+        this.#handlers[singleBinding] = [];
+      }
+
+      // Store the handler with bindings array for reconstruction
+      this.#handlers[singleBinding].push({
+        element: handlerElementId,
+        func,
+        property,
+        pipe,
+        bindings: bindingsArray, // Store all bindings this handler depends on
+      });
     });
 
     // Track handlerId <-> element association for efficient cleanup
@@ -1588,25 +1646,38 @@ class MateriaJS {
       handlerIds.add(handlerElementId);
     }
 
-    // get the index of the binding in the handler's array
-    const index = this.#handlers[binding].length - 1;
-
+    // Handle triggers for each binding
     if (triggers.length > 0) {
-      triggers.forEach((trigger) => {
-        const triggerBinding = `${binding}.${trigger}`;
+      bindingsArray.forEach((singleBinding) => {
+        triggers.forEach((trigger) => {
+          const triggerBinding = `${singleBinding}.${trigger}`;
 
-        if (!this.#triggers[triggerBinding]) {
-          this.#triggers[triggerBinding] = [];
-        }
+          if (!this.#triggers[triggerBinding]) {
+            this.#triggers[triggerBinding] = [];
+          }
 
-        this.#triggers[triggerBinding].push({
-          binding,
-          handler: this.#handlers[binding][index],
+          // Get the handler we just added for this binding
+          const handlerIndex = this.#handlers[singleBinding].length - 1;
+          this.#triggers[triggerBinding].push({
+            binding: singleBinding,
+            handler: this.#handlers[singleBinding][handlerIndex],
+          });
         });
       });
     }
 
-    const result = preservedFunc(this.get(binding), elements, clientPipe);
+    // Construct data object for the function call
+    let data;
+    if (Array.isArray(binding)) {
+      data = {};
+      binding.forEach((b) => {
+        data[b] = this.get(b);
+      });
+    } else {
+      data = this.get(binding);
+    }
+
+    const result = preservedFunc(data, elements, clientPipe);
 
     if (result !== null) {
       this.#setElementAttribute(element, property, result, depth);
