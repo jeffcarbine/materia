@@ -1734,9 +1734,9 @@ class MateriaJS {
     // Construct data object for the function call
     let data;
     if (Array.isArray(binding)) {
-      data = {};
-      binding.forEach((b) => {
-        data[b] = this.get(b);
+      data = [];
+      binding.forEach((b, i) => {
+        data[i] = this.get(b);
       });
     } else {
       data = this.get(binding);
