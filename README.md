@@ -19,7 +19,7 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
 - [Rendering](#rendering)
   - [Client-side Render](#client-side-render)
   - [Server-side Render](#server-side-render)
-- [Data Binding](#data-binding)
+- [Binding](#binding)
   - [Nested Bindings](#nested-bindings)
   - [Triggers](#triggers)
   - [The Pipe](#the-pipe)
@@ -39,7 +39,7 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
 
 ## Description
 
-Materia is a lightweight JavaScript framework designed for rendering both server-side and client-side HTML. It includes a library of all valid HTML elements, including SVG elements, and provides a simple API for data binding and rendering.
+Materia is a lightweight JavaScript framework designed for rendering both server-side and client-side HTML. It includes a library of all valid HTML elements, including SVG elements, and provides a simple API for binding and rendering.
 
 ## Prerequisites
 
@@ -116,7 +116,7 @@ There are a few exceptions to this rule:
 - `child` accepts a single object to render as the element's sole child
 - `class` in lieu of className, for simplicity - however `className` does still work
 - `if` conditionally renders an element
-- `binding` the data value to bind the attribute to
+- `binding` the key to bind the attribute to
 
 ```js
 const showElement = false;
@@ -283,24 +283,57 @@ app.get("/", (req, res) => {
 });
 ```
 
-## Data Binding
+## Binding
 
-Data-bind functions are anonymous functions that run anytime a bound piece of data is updated on a MateriaJS instance.
+Binding functions are anonymous functions that run anytime a bound piece of data is updated on a MateriaJS instance. The function is bound to the data via a string known as a **binding key**. This can be a single value, or can be dot notation of a larger object.
 
-To data-bind, pass an anonymous function to an element's property. The anonymous function can accept up to three parameters:
+To bind, set the `binding` property on an element to the desired binding key, then pass an anonymous function to an element's property. The anonymous function can accept up to three parameters:
 
-- The data being bound (always available)
+- The data being bound
 - The `materiajs/elements` library of elements (optional, when you need access to Materia elements)
 - The piped data to the function (optional, when you need access to piped components/functions)
 
-To start, you need to add data to a MateriaJS instance using the `.set()` method. The first parameter of the `set()` function is known as the `binding`.
+### Server-side binding setup
+
+You can pre-bind values from the server by declaring `props`. The `props` declaration must be an object with unique key/value pairs. The values may be static values, or may be anonymous functions with a parameter of `data`. The `data` parameter is the same as the `data` parameter that is passed to the view.
+
+You can declare app-wide bindings by passing the `props` to the engine, or you can declare view-specific bindings by creating a secondary export of `props` in your view.
+
+```js
+// App-wide binding
+const props = {
+  someBool: true,
+  username: "John Doe",
+  someData: () => {
+    return Model.find();
+  },
+};
+
+const app = express();
+engine(app, props);
+```
+
+```js
+// View-specific binding
+export const props = {
+  someBool: true,
+  username: "John Doe",
+  someData: () => {
+    return Model.find();
+  },
+};
+```
+
+### Client-side binding setup
+
+To set data for binding on the client-side, you need to add data to a MateriaJS instance using the `.set()` method. The first parameter of the `set()` method is the binding key.
 
 ```js
 const materia = new MateriaJS();
 
 materia.set("test", {
   class: "test-element",
-  text: "This is a test of data-binding",
+  text: "This is a test of binding",
   children: ["one", "two", "three"],
 });
 ```
@@ -309,7 +342,7 @@ Then, instead of writing static values in your elements, you can define the bind
 
 ### Nested Bindings
 
-You can bind to specific nested properties within your data objects by using dot notation in your binding strings. This allows for more granular control over which elements update when specific parts of your data change.
+You can bind to specific nested properties within your data objects by using dot notation in your binding keys. This allows for more granular control over which elements update when specific parts of your data change.
 
 **Important notes about nested bindings:**
 
@@ -594,7 +627,7 @@ Any element's property bound verbatim to the value being manipulated will have i
 ```js
 materia.set("test", {
   class: "test-element",
-  text: "This is a test of data-binding",
+  text: "This is a test of binding",
   children: ["one", "two", "three"],
   name: {
     first: "John",
