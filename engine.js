@@ -39,47 +39,17 @@ const handledata = async (Materia, key, data) => {
 
 const viewCache = new Map();
 
-export default async (app) => {
+export default async (app, appProps) => {
   app.engine("html.js", (filePath, data, callback) => {
     if (viewCache.has(filePath)) {
       const cachedView = viewCache.get(filePath);
-      renderView(cachedView, data, callback);
+      renderView(cachedView, data, appProps, callback);
     } else {
       import(filePath)
         .then(async (view) => {
           viewCache.set(filePath, view);
 
-          // if (typeof view.config === "function") {
-          //   // Register routes only once per view
-          //   const config = view.config(data);
-
-          //   if (config && typeof config === "object") {
-          //     for (const key in config) {
-          //       const { route } = config[key];
-
-          //       if (route) {
-          //         if (typeof route === "function") {
-          //           if (!registeredRoutes.has(key)) {
-          //             route(app);
-          //             registeredRoutes.add(key);
-          //           } else {
-          //             console.error(`Route for ${key} already registered.`);
-          //           }
-          //         } else {
-          //           console.error(
-          //             `Error in routes: Expected function for key "${key}", but got ${typeof route}.`
-          //           );
-          //         }
-          //       }
-          //     }
-          //   } else {
-          //     console.error(
-          //       `Error in config: Expected an object, but got ${typeof config}.`
-          //     );
-          //   }
-          // }
-
-          renderView(view, data, callback);
+          renderView(view, data, appProps, callback);
         })
         .catch((err) => {
           console.error(err);
@@ -102,41 +72,33 @@ export default async (app) => {
   });
 };
 
-const renderView = async (view, _data, callback) => {
+const renderView = async (view, _data, appProps = {}, callback) => {
   const Materia = new MateriaJS();
 
-  const viewData = { ...view.data } || {};
+  const viewProps = view.data || view.props || {};
+
+  const props = { ...viewProps, ...appProps };
 
   if (_data.user) {
-    // we need to pass any user data to the viewData
-    viewData.user = _data.user;
+    // we need to pass any user data to the viewProps
+    props.user = _data.user;
   }
 
-  // and add all of the viewData to the _data under the materia key
+  // and add all of the viewProps to the _data under the materia key
   _data.materia = {};
 
-  if (viewData) {
-    if (typeof viewData === "object") {
-      for (const key in viewData) {
-        const data =
-          typeof viewData[key] === "function"
-            ? await viewData[key](_data)
-            : viewData[key];
+  if (props) {
+    if (typeof props === "object") {
+      for (const key in props) {
+        const propsData =
+          typeof props[key] === "function"
+            ? await props[key](_data)
+            : props[key];
 
-        await handledata(Materia, key, data);
+        await handledata(Materia, key, propsData);
 
         // and then set the data on the _data.materia object as well
-        _data.materia[key] = data;
-
-        // if (endpoint) {
-        //   if (typeof endpoint === "string") {
-        //     Materia.setEndpoint(key, endpoint);
-        //   } else {
-        //     console.error(
-        //       `Error in endpoints: Expected string for key "${key}", but got ${typeof endpoint}.`
-        //     );
-        //   }
-        // }
+        _data.materia[key] = propsData;
       }
     } else {
       console.error(

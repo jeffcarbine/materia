@@ -183,6 +183,21 @@ class MateriaJS {
   }
 
   /**
+   * Sums a value to a binding if it exists
+   * @param {*} binding
+   * @param {*} value
+   * @returns
+   */
+  sum(binding, value) {
+    const currentValue = this.get(binding);
+    if (typeof currentValue === "number" && typeof value === "number") {
+      this.set(binding, currentValue + value);
+    } else {
+      console.error(`Error: Cannot sum non-numeric values at ${binding}`);
+    }
+  }
+
+  /**
    * Updates multiple bindings based on an object structure
    * @param {string} binding - The root binding to update
    * @param {Object} data - The data object containing updates
@@ -220,6 +235,51 @@ class MateriaJS {
           updateRecursive(newBinding, value);
         } else {
           this.set(newBinding, value);
+        }
+      }
+    };
+
+    updateRecursive(binding, data);
+  }
+
+  /**
+   * Sums multiple bindings based on an object structure
+   * @param {*} binding
+   * @param {*} data
+   */
+  sumUpdate(binding, data) {
+    // Validate binding
+    if (typeof binding !== "string" || binding.trim() === "") {
+      console.error("Invalid binding: Binding must be a non-empty string.");
+      return;
+    }
+
+    // Validate data
+    if (typeof data !== "object" || data === null) {
+      console.error("Invalid data: Data must be a non-null object.");
+      return;
+    }
+
+    const updateRecursive = (currentBinding, currentData) => {
+      if (
+        typeof currentData !== "object" ||
+        currentData === null ||
+        Array.isArray(currentData)
+      ) {
+        this.sum(currentBinding, currentData);
+        return;
+      }
+
+      for (const key in currentData) {
+        const newBinding = currentBinding ? `${currentBinding}.${key}` : key;
+        const value = currentData[key];
+
+        if (Array.isArray(value)) {
+          this.sum(newBinding, value);
+        } else if (typeof value === "object" && value !== null) {
+          updateRecursive(newBinding, value);
+        } else {
+          this.sum(newBinding, value);
         }
       }
     };
@@ -450,9 +510,11 @@ class MateriaJS {
    * Manually runs a binding
    */
   run(binding) {
-    if (this.#handlers[binding]) {
-      for (const handler of this.#handlers[binding]) {
-        this.#handle(binding, handler);
+    for (const key in this.#handlers) {
+      if (key === binding || key.startsWith(binding + ".")) {
+        for (const handler of this.#handlers[key]) {
+          this.#handle(key, handler);
+        }
       }
     }
   }
@@ -632,6 +694,9 @@ class MateriaJS {
       this.#clearChildren(element);
       if (value === null) return;
     }
+
+    // filter boolean values out of the children array
+    children = children.filter(Boolean);
 
     children.forEach((child) => {
       const childElement = this.render(child, null, depth + 1);
