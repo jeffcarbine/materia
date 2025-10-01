@@ -927,9 +927,9 @@ class MateriaJS {
     let data;
     if (bindings && bindings.length > 1) {
       // Array binding - construct object with all bound values
-      data = {};
-      bindings.forEach((b) => {
-        data[b] = this.get(b);
+      data = [];
+      bindings.forEach((b, i) => {
+        data[i] = this.get(b);
       });
     } else {
       // Single binding - use the binding value directly
