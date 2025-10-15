@@ -1061,12 +1061,52 @@ class MateriaJS {
     }
 
     if (event === "load" && !isServer) {
-      // then we need to run this function immediately
-      // because we are rendering on the client side
-      this.#stashedLoadEvent = eventData;
+      // Check if element is in the DOM before executing
+      if (document.body.contains(target)) {
+        // Element is in DOM, execute immediately
+        func(target, pipe, elements, { type: "load", target });
+      } else {
+        // Element not in DOM yet, defer until it is
+        this.#deferLoadEvent(target, func, pipe);
+      }
     } else {
       this.#delegate[event].push(eventData);
     }
+  }
+
+  /**
+   * Defers a load event until the target element is in the DOM
+   * Uses MutationObserver to watch for when the element is added
+   * @param {Element} target - The target element
+   * @param {Function} func - The load handler function
+   * @param {Object} pipe - The pipe data
+   */
+  #deferLoadEvent(target, func, pipe) {
+    // Use MutationObserver to watch for when the element is added to the DOM
+    const observer = new MutationObserver((mutations, obs) => {
+      if (document.body.contains(target)) {
+        // Element is now in the DOM, execute the load handler
+        func(target, pipe, elements, { type: "load", target });
+        obs.disconnect(); // Stop observing
+      }
+    });
+
+    // Start observing the document body for added nodes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    // Safety timeout: disconnect after 5 seconds if element never appears
+    setTimeout(() => {
+      if (observer) {
+        observer.disconnect();
+        console.warn(
+          "Load event deferred for more than 5 seconds, giving up:",
+          target
+        );
+      }
+    }, 5000);
   }
 
   /**
@@ -1413,8 +1453,6 @@ class MateriaJS {
     });
   }
 
-  #stashedLoadEvent = null;
-
   /**
    * Renders the template into HTML.
    *
@@ -1514,40 +1552,6 @@ class MateriaJS {
     if (isServer && depth === 0) {
       return this.#handleServerSideRendering(element);
     } else {
-      // if we have a stashed load event, run it
-      if (this.#stashedLoadEvent) {
-        const { target, func, pipe } = this.#stashedLoadEvent;
-
-        const maxWaitTime = 5000; // Maximum wait time in milliseconds
-        const intervalTime = 10; // Interval time in milliseconds
-        let elapsedTime = 0;
-        let interval;
-
-        try {
-          interval = setInterval(() => {
-            try {
-              if (target.parentNode) {
-                func(target, pipe, elements);
-                clearInterval(interval);
-              } else {
-                elapsedTime += intervalTime;
-                if (elapsedTime >= maxWaitTime) {
-                  console.warn(
-                    `Giving up after ${maxWaitTime}ms: target element not found in DOM.`
-                  );
-                  clearInterval(interval);
-                }
-              }
-            } catch (err) {
-              clearInterval(interval);
-              throw err;
-            }
-          }, intervalTime);
-        } finally {
-          // Defensive: ensure interval is cleared if function exits unexpectedly
-          setTimeout(() => clearInterval(interval), maxWaitTime + intervalTime);
-        }
-      }
       // handle client-side rendering
       if (callbackOrQuery) {
         if (typeof callbackOrQuery === "function") {
