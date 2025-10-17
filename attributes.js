@@ -432,6 +432,7 @@ export const validAttributes = [
   "xml:base",
   "xml:lang",
   "xml:space",
+  "xmlns",
   "y",
   "y1",
   "y2",

@@ -1579,6 +1579,43 @@ class MateriaJS {
       xmlns: "http://www.w3.org/2000/xmlns/",
       default: "http://www.w3.org/1999/xhtml",
     };
+
+    // SVG elements that need the SVG namespace
+    const svgElements = [
+      "svg",
+      "path",
+      "circle",
+      "rect",
+      "line",
+      "polygon",
+      "polyline",
+      "ellipse",
+      "g",
+      "defs",
+      "use",
+      "symbol",
+      "marker",
+      "clipPath",
+      "mask",
+      "pattern",
+      "text",
+      "tspan",
+      "textPath",
+      "image",
+      "foreignObject",
+      "lineargradient",
+      "radialgradient",
+      "stop",
+      "animate",
+      "animatetransform",
+      "switch",
+      "metadata",
+    ];
+
+    if (svgElements.includes(tagName.toLowerCase())) {
+      return namespaces.svg;
+    }
+
     return namespaces[tagName] || namespaces.default;
   }
 
