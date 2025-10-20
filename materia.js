@@ -450,12 +450,12 @@ class MateriaJS {
 
     if (!target) {
       console.error(`Error: ${binding} is not defined.`);
-      return;
+      return null;
     }
 
     if (!Array.isArray(target)) {
       console.error(`Error: ${binding} is not an array.`);
-      return;
+      return null;
     }
 
     // Define the queryFunction
@@ -468,13 +468,17 @@ class MateriaJS {
     const arrayIndex = target.findIndex(queryFunction(query));
 
     if (arrayIndex > -1) {
-      target.splice(arrayIndex, 1);
+      // return the removed element
+      const removedElement = target.splice(arrayIndex, 1);
       this.#handleBindingUpdate(binding);
+      return removedElement[0];
     } else {
       console.warn(
         `Warning: No matching element found in ${binding} for removal.`
       );
     }
+
+    return null;
   }
 
   /**
