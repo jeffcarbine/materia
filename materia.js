@@ -752,7 +752,11 @@ class MateriaJS {
     for (let key in pipe) {
       if (typeof pipe[key] === "function") {
         pipe[key] = this.#stringifyFunction(pipe[key]);
-      } else if (typeof pipe[key] === "object" && pipe[key] !== null) {
+      } else if (
+        pipe.key !== null &&
+        typeof pipe[key] === "object" &&
+        pipe[key] !== null
+      ) {
         if (pipe[key].path && !pipe[key].path.startsWith(IMPORT_PREFIX)) {
           pipe[key].path = `${IMPORT_PREFIX}${pipe[key].path}`;
         }
@@ -1047,7 +1051,11 @@ class MateriaJS {
     // check to see if the pipe has any path values that need to be promoted
     if (pipe) {
       for (let key in pipe) {
-        if (typeof pipe[key] === "object" && pipe[key].path) {
+        if (
+          pipe[key] !== null &&
+          typeof pipe[key] === "object" &&
+          pipe[key].path
+        ) {
           pipe[key] = pipe[key].path;
         }
       }
@@ -1685,7 +1693,13 @@ class MateriaJS {
       for (const key in pipe) {
         const value = pipe[key];
 
-        if (value && typeof value === "object" && value?.data && value?.path) {
+        if (
+          value &&
+          value !== null &&
+          typeof value === "object" &&
+          value?.data &&
+          value?.path
+        ) {
           // assign the data to the clientPipe
           clientPipe[key] = value.data;
         } else {
