@@ -112,21 +112,16 @@ class MateriaJS {
     return value;
   }
 
-  set(binding, value) {
-    // Validate binding
-    if (typeof binding !== "string" || binding.trim() === "") {
-      console.error("Invalid binding: Binding must be a non-empty string.");
-      return;
-    }
-
-    // Validate value
-    if (value === undefined) {
-      console.error("Invalid value: Value cannot be undefined.");
-      return;
-    }
-
+  /**
+   * Creates nested binding structure and sets the value.
+   * Does not trigger handlers or circuit breaker checks.
+   * @param {string} binding - The binding path to create.
+   * @param {*} value - The value to set at the binding.
+   * @returns {boolean} True if successful, false if there was an error.
+   */
+  #createNestedBinding(binding, value) {
     // Split the binding string into individual keys
-    const keys = binding.split(/[\.\[\]]/).filter(Boolean);
+    const keys = binding.split(/[\.[\]]/).filter(Boolean);
     let target = this.#data;
 
     // Iterate over the keys to traverse the data structure
@@ -146,7 +141,7 @@ class MateriaJS {
         // Ensure the target is an array
         if (!Array.isArray(target[arrayKey])) {
           console.error(`Error: ${arrayKey} is not an array.`);
-          return;
+          return false;
         }
 
         if (i === keys.length - 1) {
@@ -171,11 +166,98 @@ class MateriaJS {
             console.error(
               `Error: Cannot set property on non-object value at ${key}`
             );
-            return;
+            return false;
           }
           target = target[key];
         }
       }
+    }
+
+    return true;
+  }
+
+  /**
+   * Deep equality check for comparing values (handles primitives, arrays, objects).
+   * @param {*} a - First value to compare
+   * @param {*} b - Second value to compare
+   * @returns {boolean} True if values are deeply equal
+   */
+  #deepEqual(a, b) {
+    // Handle primitive types and null/undefined
+    if (a === b) return true;
+
+    // Handle null/undefined cases
+    if (a == null || b == null) return false;
+
+    // Handle different types
+    if (typeof a !== typeof b) return false;
+
+    // Handle arrays
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (!this.#deepEqual(a[i], b[i])) return false;
+      }
+      return true;
+    }
+
+    // Handle objects
+    if (typeof a === "object" && typeof b === "object") {
+      const keysA = Object.keys(a);
+      const keysB = Object.keys(b);
+
+      if (keysA.length !== keysB.length) return false;
+
+      for (const key of keysA) {
+        if (!keysB.includes(key)) return false;
+        if (!this.#deepEqual(a[key], b[key])) return false;
+      }
+      return true;
+    }
+
+    // For everything else, use strict equality
+    return false;
+  }
+
+  set(binding, value) {
+    // Check circuit breaker first
+    if (this.#checkCircuitBreaker(binding)) {
+      console.error(
+        `CIRCUIT BREAKER TRIPPED: Infinite loop detected for binding "${binding}". ` +
+          `This binding has been updated ${
+            this.#circuitBreaker.maxUpdates
+          }+ times in ${this.#circuitBreaker.timeWindow}ms. ` +
+          `Blocking further updates to prevent infinite loop.`
+      );
+      return;
+    }
+
+    // Validate binding
+    if (typeof binding !== "string" || binding.trim() === "") {
+      console.error("Invalid binding: Binding must be a non-empty string.");
+      return;
+    }
+
+    // Validate value
+    if (value === undefined) {
+      console.error("Invalid value: Value cannot be undefined.");
+      return;
+    }
+
+    // make sure the value being set isn't identical to the current value
+    // to prevent infinite loops or unnecessary updates
+    const currentValue = this.get(binding);
+
+    // Deep equality check for arrays and objects
+    if (this.#deepEqual(currentValue, value)) {
+      return;
+    }
+
+    // Create the nested binding and set the value
+    const success = this.#createNestedBinding(binding, value);
+
+    if (!success) {
+      return;
     }
 
     // Handle any updates to bindings
@@ -212,6 +294,21 @@ class MateriaJS {
     // Validate data
     if (typeof data !== "object" || data === null) {
       console.error("Invalid data: Data must be a non-null object.");
+      return;
+    }
+
+    // Check to see if the key/value pairs being updated aren't identical
+    // to the current values to prevent infinite loops or unnecessary updates
+    const currentValue = this.get(binding);
+    let identical = true;
+    for (const key in data) {
+      if (currentValue[key] !== data[key]) {
+        identical = false;
+        break;
+      }
+    }
+
+    if (identical) {
       return;
     }
 
@@ -310,7 +407,7 @@ class MateriaJS {
     if (target === "") {
       target = [];
       // then we need to replace the null value with an empty array
-      this.set(binding, target);
+      this.#createNestedBinding(binding, target);
     }
 
     if (!target) {
@@ -350,7 +447,7 @@ class MateriaJS {
     if (target === "") {
       target = [];
       // then we need to replace the null value with an empty array
-      this.set(binding, target);
+      this.#createNestedBinding(binding, target);
     }
 
     if (!target) {
@@ -388,7 +485,7 @@ class MateriaJS {
 
     if (target === "") {
       target = [];
-      this.set(binding, target);
+      this.#createNestedBinding(binding, target);
     }
 
     if (!target) {
@@ -529,6 +626,21 @@ class MateriaJS {
   #data = {};
 
   /**
+   * Circuit breaker to prevent infinite loops.
+   * Tracks update counts and timestamps per binding.
+   */
+  #circuitBreaker = {
+    // Map of binding -> array of recent update timestamps
+    updates: new Map(),
+    // Maximum updates allowed within the time window
+    maxUpdates: 20,
+    // Time window in milliseconds
+    timeWindow: 1000,
+    // Whether the circuit breaker has been tripped
+    tripped: new Set(),
+  };
+
+  /**
    * Lets you check to see what the data is currently at
    * @returns {Object} The review object, which contains the data, handlers and delegate.
    */
@@ -605,7 +717,8 @@ class MateriaJS {
     ];
 
     if (booleanAttributes.includes(key) && value === false) {
-      element.removeAttribute(key);
+      // element.removeAttribute(key);
+      element[key] = false;
     } else {
       const hasUpperCase = /[A-Z]/.test(key);
       if (hasUpperCase) {
@@ -1894,6 +2007,66 @@ class MateriaJS {
       // Remove the child from the DOM
       element.removeChild(child);
     });
+  }
+
+  /**
+   * Checks if the circuit breaker should trip for a given binding.
+   * Tracks update frequency and trips if too many updates occur in a short time.
+   * @param {string} binding - The binding to check
+   * @returns {boolean} True if circuit breaker is tripped, false otherwise
+   */
+  #checkCircuitBreaker(binding) {
+    // If already tripped for this binding, keep it tripped
+    if (this.#circuitBreaker.tripped.has(binding)) {
+      return true;
+    }
+
+    const now = Date.now();
+    const updates = this.#circuitBreaker.updates.get(binding) || [];
+
+    // Remove timestamps outside the time window
+    const recentUpdates = updates.filter(
+      (timestamp) => now - timestamp < this.#circuitBreaker.timeWindow
+    );
+
+    // Add current update
+    recentUpdates.push(now);
+
+    // Update the tracking
+    this.#circuitBreaker.updates.set(binding, recentUpdates);
+
+    // Check if we've exceeded the threshold
+    if (recentUpdates.length > this.#circuitBreaker.maxUpdates) {
+      this.#circuitBreaker.tripped.add(binding);
+
+      // Auto-reset after a longer cooldown period (5 seconds)
+      setTimeout(() => {
+        this.#circuitBreaker.tripped.delete(binding);
+        this.#circuitBreaker.updates.delete(binding);
+        console.warn(
+          `Circuit breaker reset for binding "${binding}". ` +
+            `You can now update this binding again, but please fix the infinite loop.`
+        );
+      }, 5000);
+
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Manually resets the circuit breaker for a specific binding or all bindings.
+   * @param {string} [binding] - Optional specific binding to reset. If omitted, resets all.
+   */
+  resetCircuitBreaker(binding) {
+    if (binding) {
+      this.#circuitBreaker.tripped.delete(binding);
+      this.#circuitBreaker.updates.delete(binding);
+    } else {
+      this.#circuitBreaker.tripped.clear();
+      this.#circuitBreaker.updates.clear();
+    }
   }
 
   destroy(bindingOrElement) {
