@@ -1,6 +1,6 @@
 # Materia
 
-A lightweight JavaScript framework for rendering both server-side and client-side HTML.
+An extremely lightweight JavaScript framework for both server-side and client-side rendering.
 
 ![npm](https://img.shields.io/npm/v/materiajs)
 ![license](https://img.shields.io/npm/l/materiajs)
@@ -197,7 +197,7 @@ const materia = new MateriaJS();
 
 // renders an element and runs a callback
 materia.render(new H1("Hello World"), (element) =>
-  document.body.appendChild(element)
+  document.body.appendChild(element),
 );
 
 // renders an element and appends it to "body"
@@ -608,7 +608,7 @@ materia.set("users", [
 materia.setInArray(
   "users",
   { id: 1 },
-  { id: 1, name: "John Doe", active: true }
+  { id: 1, name: "John Doe", active: true },
 );
 
 // Add new user (since id: 3 doesn't exist)
