@@ -108,17 +108,17 @@ export class Element {
 }
 
 export class Html extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "html";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 export class Head extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "head";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
@@ -155,127 +155,127 @@ export class Meta extends Element {
 }
 
 export class Style extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "style";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Title extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "title";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Body extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "body";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Address extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "address";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Article extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "article";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Aside extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "aside";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Footer extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "footer";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Header extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "header";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class H1 extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "h1";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class H2 extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "h2";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class H3 extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "h3";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class H4 extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "h4";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class H5 extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "h5";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class H6 extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "h6";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Hgroup extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "hgroup";
 
     if (!this.children) {
       this.children = [];
     }
 
-    if (config.h) {
+    if (typeof config === "object" && !Array.isArray(config) && config.h) {
       const heading = new Element();
       heading.tagName = `h${config.h}`;
       heading.initialize({
@@ -288,7 +288,11 @@ export class Hgroup extends Element {
       delete config.textContent;
     }
 
-    if (config.subheading) {
+    if (
+      typeof config === "object" &&
+      !Array.isArray(config) &&
+      config.subheading
+    ) {
       this.children.push(
         new P({
           textContent: config.subheading,
@@ -298,7 +302,11 @@ export class Hgroup extends Element {
       delete config.subheading;
     }
 
-    if (config.preheading) {
+    if (
+      typeof config === "object" &&
+      !Array.isArray(config) &&
+      config.preheading
+    ) {
       this.children.unshift(
         new P({
           textContent: config.preheading,
@@ -308,87 +316,87 @@ export class Hgroup extends Element {
       delete config.preheading;
     }
 
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Main extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "main";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Nav extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "nav";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Section extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "section";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Blockquote extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "blockquote";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Dd extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "dd";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Div extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "div";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Dl extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "dl";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Dt extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "dt";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Figcaption extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "figcaption";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Figure extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "figure";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
@@ -401,35 +409,40 @@ export class Hr extends Element {
 }
 
 export class Menu extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "menu";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class P extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "p";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Pre extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "pre";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class ListElement extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
 
     // if we have config.children
-    if (config.children && Array.isArray(config.children)) {
+    if (
+      typeof config === "object" &&
+      !Array.isArray(config) &&
+      config.children &&
+      Array.isArray(config.children)
+    ) {
       // ensure that they are all wrapped in Li elements
       config.children = config.children.map((child) =>
         child instanceof Li ? child : new Li(child),
@@ -439,38 +452,43 @@ export class ListElement extends Element {
 }
 
 export class Ul extends ListElement {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "ul";
 
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Ol extends ListElement {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "ol";
 
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Li extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "li";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class A extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "a";
 
     // if the href is an external link, then add the noopener and noreferrer attributes
-    if (config.href && config.href.startsWith("http")) {
+    if (
+      typeof config === "object" &&
+      !Array.isArray(config) &&
+      config.href &&
+      config.href.startsWith("http")
+    ) {
       if (!config.rel) {
         config.rel = "noopener noreferrer";
       } else if (!config.rel.includes("noopener noreferrer")) {
@@ -478,39 +496,39 @@ export class A extends Element {
       }
     }
 
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Abbr extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "abbr";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class B extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "b";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Bdi extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "bdi";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Bdo extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "bdo";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
@@ -523,178 +541,178 @@ export class Br extends Element {
 }
 
 export class Cite extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "cite";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Code extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "code";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Data extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "data";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Dfn extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "dfn";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Em extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "em";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class I extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "i";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Kbd extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "kbd";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Mark extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "mark";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Q extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "q";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Rp extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "rp";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Rt extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "rt";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Ruby extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "ruby";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class S extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "s";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Samp extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "samp";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Small extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "small";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Span extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "span";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Strong extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "strong";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Sub extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "sub";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Sup extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "sup";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Time extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "time";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class U extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "u";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Var extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "var";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
@@ -715,10 +733,10 @@ export class Area extends Element {
 }
 
 export class Audio extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "audio";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
@@ -738,10 +756,10 @@ export class LazyImg extends Img {
 }
 
 export class Map extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "map";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
@@ -754,10 +772,10 @@ export class Track extends Element {
 }
 
 export class Video extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "video";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
@@ -770,18 +788,18 @@ export class Embed extends Element {
 }
 
 export class Iframe extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "iframe";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Object extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "object";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
@@ -794,10 +812,10 @@ export class Param extends Element {
 }
 
 export class Picture extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "picture";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
@@ -810,58 +828,58 @@ export class Source extends Element {
 }
 
 export class Canvas extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "canvas";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Noscript extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "noscript";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Script extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "script";
     this.defer = true;
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Module extends Script {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.type = "module";
   }
 }
 
 export class Del extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "del";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Ins extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "ins";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Caption extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "caption";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
@@ -874,100 +892,100 @@ export class Col extends Element {
 }
 
 export class Colgroup extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "colgroup";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Table extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "table";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class TBody extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "tbody";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Td extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "td";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Tfoot extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "tfoot";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Th extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "th";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class THead extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "thead";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Tr extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "tr";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Button extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "button";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Datalist extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "datalist";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Fieldset extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "fieldset";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Form extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "form";
 
-    // if no config, create an empty object
-    if (!config) {
+    // if no config or not an object, create an empty object
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
       config = {};
     }
 
@@ -975,7 +993,7 @@ export class Form extends Element {
       config.method = "POST";
     }
 
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
@@ -1142,419 +1160,419 @@ export class ButtonInput extends Input {
 }
 
 export class Label extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "label";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Legend extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "legend";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Meter extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "meter";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Optgroup extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "optgroup";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Option extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "option";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Output extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "output";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Progress extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "progress";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Select extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "select";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Textarea extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "textarea";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Details extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "details";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Dialog extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "dialog";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Summary extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "summary";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Slot extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "slot";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Template extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "template";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Svg extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "svg";
     this.version = "1.1";
     this.xmlns = "http://www.w3.org/2000/svg";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Circle extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "circle";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Ellipse extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "ellipse";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Line extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "line";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Path extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "path";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Polygon extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "polygon";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Polyline extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "polyline";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Rect extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "rect";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Text extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "text";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Tspan extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "tspan";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class G extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "g";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Defs extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "defs";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class LinearGradient extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "linearGradient";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class RadialGradient extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "radialGradient";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Stop extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "stop";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Use extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "use";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Symbol extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "symbol";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class ClipPath extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "clipPath";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Pattern extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "pattern";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Mask extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "mask";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Filter extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "filter";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeGaussianBlur extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feGaussianBlur";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeOffset extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feOffset";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeBlend extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feBlend";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeColorMatrix extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feColorMatrix";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeComponentTransfer extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feComponentTransfer";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeComposite extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feComposite";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeConvolveMatrix extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feConvolveMatrix";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeDiffuseLighting extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feDiffuseLighting";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeDisplacementMap extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feDisplacementMap";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeFlood extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feFlood";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeImage extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feImage";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeMerge extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feMerge";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeMorphology extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feMorphology";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeSpecularLighting extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feSpecularLighting";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeTile extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feTile";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class FeTurbulence extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "feTurbulence";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
 
 export class Math extends Element {
-  constructor(config) {
-    super(config);
+  constructor(config, children) {
+    super(config, children);
     this.tagName = "math";
-    this.initialize(config);
+    this.initialize(config, children);
   }
 }
