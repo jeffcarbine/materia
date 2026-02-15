@@ -841,13 +841,12 @@ class MateriaJS {
     for (let key in imports) {
       if (typeof imports[key] === "function") {
         imports[key] = this.#stringifyFunction(imports[key]);
-      } else if (
-        imports.key !== null &&
-        typeof imports[key] === "object" &&
-        imports[key] !== null
-      ) {
-        if (imports[key].path && !imports[key].path.startsWith(IMPORT_PREFIX)) {
-          imports[key].path = `${IMPORT_PREFIX}${imports[key].path}`;
+      } else if (Array.isArray(imports[key])) {
+        // Handle array format: [Component, "/path"]
+        if (imports[key].length === 2 && typeof imports[key][1] === "string") {
+          if (!imports[key][1].startsWith(IMPORT_PREFIX)) {
+            imports[key][1] = `${IMPORT_PREFIX}${imports[key][1]}`;
+          }
         }
       }
     }
@@ -948,7 +947,47 @@ class MateriaJS {
 
   async #resolveIncompleteImports(imports) {
     for (let key in imports) {
-      if (typeof imports[key] === "string") {
+      if (Array.isArray(imports[key])) {
+        // Handle array format: [Component, "import::/path"]
+        if (imports[key].length === 2 && typeof imports[key][1] === "string") {
+          if (imports[key][1].startsWith(IMPORT_PREFIX)) {
+            let path = imports[key][1].replace(IMPORT_PREFIX, "");
+
+            // Sanitize the path before importing
+            path = this.#sanitizePath(path);
+            if (!path) {
+              imports[key] = null; // Set to null if the path is invalid
+              continue;
+            }
+
+            // Check if the component is already imported
+            if (this.#importCache[path]) {
+              imports[key] =
+                this.#importCache[path][key] || this.#importCache[path].default;
+            } else {
+              try {
+                // Dynamically import the component
+                const module = await import(path);
+
+                // Cache the imported module
+                this.#importCache[path] = module;
+
+                // Check for named export or default export
+                const component = module[key] || module.default;
+
+                if (component) {
+                  imports[key] = component;
+                } else {
+                  console.error(`Component ${key} not found in ${path}`);
+                }
+              } catch (error) {
+                console.error(`Error importing ${path}:`, error);
+                imports[key] = null; // Fallback: Set imports[key] to null
+              }
+            }
+          }
+        }
+      } else if (typeof imports[key] === "string") {
         if (imports[key].startsWith(IMPORT_PREFIX)) {
           let path = imports[key].replace(IMPORT_PREFIX, "");
 
@@ -1816,15 +1855,9 @@ class MateriaJS {
       for (const key in imports) {
         const value = imports[key];
 
-        if (
-          value &&
-          value !== null &&
-          typeof value === "object" &&
-          value?.data &&
-          value?.path
-        ) {
-          // assign the data to the clientImports
-          clientImports[key] = value.data;
+        if (Array.isArray(value) && value.length === 2) {
+          // Handle array format: [Component, "/path"]
+          clientImports[key] = value[0];
         } else {
           clientImports[key] = value;
         }
@@ -1851,13 +1884,9 @@ class MateriaJS {
       if (imports) {
         for (const key in imports) {
           const value = imports[key];
-          if (
-            value &&
-            typeof value === "object" &&
-            value?.data &&
-            value?.path
-          ) {
-            imports[key] = value.path;
+          if (Array.isArray(value) && value.length === 2) {
+            // Handle array format: [Component, "/path"]
+            imports[key] = value[1];
           } else {
             imports[key] = value;
           }
