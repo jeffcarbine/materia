@@ -1658,7 +1658,7 @@ class MateriaJS {
 
         // If the value is a function and the key isn't an event, it's a binding
         if (typeof value === "function" && !this.#eventTypes.includes(key)) {
-          let binding = template.$_bind;
+          let binding = template.$_binding;
           let triggers = template.$_triggers || [];
 
           // if the binding is undefined, we need to alert the user and continue the render

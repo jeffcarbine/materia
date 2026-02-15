@@ -26,7 +26,7 @@ export class Element {
 
     if (children) {
       // If children is a function and we have a binding, assign it directly for data-binding
-      if (typeof children === "function" && config.$_bind) {
+      if (typeof children === "function" && config.$_binding) {
         this.children = children;
       } else {
         // check if the children is an array, if not wrap it in an array
