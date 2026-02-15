@@ -1615,25 +1615,34 @@ class MateriaJS {
       ? template.$_imports
       : this.#encodeImports(template.$_imports);
 
-    // Pull out the preventDefault value if there is one
-    const preventDefaults = template.preventDefault
-      ? Array.isArray(template.preventDefault)
-        ? template.preventDefault
-        : [template.preventDefault]
-      : [];
-
     // Process each key/value pair in the template
     Object.keys(template).forEach((key) => {
       let value = template[key];
 
-      if (
-        this.#eventTypes.includes(key) ||
-        key.startsWith("attributes:") ||
-        key.startsWith("keydown:")
-      ) {
-        // check to see if the default should be prevented
-        const preventDefault = preventDefaults.includes(key);
+      // Check if this is an event (with or without prefix)
+      let isEvent = false;
+      let preventDefault = false;
+      let eventName = key;
 
+      // Check for __ prefix (events with preventDefault)
+      if (key.startsWith("__")) {
+        eventName = key.slice(2);
+        isEvent =
+          this.#eventTypes.includes(eventName) ||
+          eventName.startsWith("keydown:");
+        preventDefault = true;
+      }
+      // Check for _ prefix (events without preventDefault and mutations)
+      else if (key.startsWith("_")) {
+        eventName = key.slice(1);
+        isEvent =
+          this.#eventTypes.includes(eventName) ||
+          eventName.startsWith("keydown:") ||
+          eventName.startsWith("attributes:");
+        preventDefault = false;
+      }
+
+      if (isEvent) {
         // create a delegateId if the element doesn't already have one
         if (!element.dataset.delegateId) {
           element.dataset.delegateId = this.#generateUniqueId();
@@ -1652,9 +1661,9 @@ class MateriaJS {
 
           // if the binding is undefined, we need to alert the user and continue the render
           if (!binding) {
-            // console.error(
-            //   `No binding found for function value: ${value.toString()}`
-            // );
+            console.error(
+              `No binding found for function value: ${value.toString()}`,
+            );
           } else {
             this.#processFunctionValue(
               element,
