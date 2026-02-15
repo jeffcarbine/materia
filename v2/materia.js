@@ -1,6 +1,12 @@
 // Import all the elements
 import * as elements from "materiajs/elements";
-import { validAttributes, validEvents, validMutations } from "./validProps";
+import {
+  validHTMLAttributes,
+  validEvents,
+  validMutations,
+  validDOMProperties,
+  validMateriaProps,
+} from "./validProps";
 
 // Standard Library Imports
 let document, fs;
@@ -681,7 +687,7 @@ class MateriaJS {
 
     if (key === "style") {
       this.#setStyle(element, value);
-    } else if (validAttributes.includes(key) || key.startsWith("data-")) {
+    } else if (validHTMLAttributes.includes(key) || key.startsWith("data-")) {
       this.#setAttribute(element, key, value);
     } else if (key === "innerHTML") {
       this.#setInnerHTML(element, value);
@@ -1588,11 +1594,6 @@ class MateriaJS {
       return null;
     }
 
-    // Check if the template has an "if" property and if it's falsy, return null
-    if (template.hasOwnProperty("if") && !template.if) {
-      return null;
-    }
-
     // If the template is a string, return a text node
     if (typeof template === "string") {
       return document.createTextNode(template);
@@ -1614,6 +1615,9 @@ class MateriaJS {
     const imports = isServer
       ? template.$_imports
       : this.#encodeImports(template.$_imports);
+
+    // Create validProps array for property validation
+    const validProps = [...validHTMLAttributes, ...validDOMProperties];
 
     // Process each key/value pair in the template
     Object.keys(template).forEach((key) => {
@@ -1650,6 +1654,21 @@ class MateriaJS {
 
         this.#addEventDelegate(element, key, value, imports, preventDefault);
       } else {
+        // Skip framework-internal keys that are already processed
+        if (validMateriaProps.includes(key)) {
+          return;
+        }
+
+        // Check if the key is a valid property
+        const isValid = validProps.includes(key) || key.startsWith("data");
+
+        if (!isValid) {
+          console.warn(
+            `Invalid property "${key}" on <${tagName}> element. This property is not a valid HTML attribute, DOM property, or framework property.`,
+          );
+          return;
+        }
+
         if (this.#isStringifiedFunction(value)) {
           value = this.#parseStringifiedFunction(value);
         }

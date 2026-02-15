@@ -92,7 +92,7 @@ export class Element {
       default: (config) => (this.textContent = config),
     };
 
-    (primitiveHandlers[this.tagName] || primitiveHandlers.default)(config);
+    (primitiveHandlers[this.$tagName] || primitiveHandlers.default)(config);
   }
 
   // TODO: determine if this should be deprecated
@@ -110,14 +110,14 @@ export class Element {
 export class Html extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "html";
+    this.$tagName = "html";
     this.initialize(config, children);
   }
 }
 export class Head extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "head";
+    this.$tagName = "head";
     this.initialize(config, children);
   }
 }
@@ -125,7 +125,7 @@ export class Head extends Element {
 export class Link extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "link";
+    this.$tagName = "link";
     this.initialize(config);
   }
 }
@@ -149,7 +149,7 @@ export class PreLoadStyle extends Link {
 export class Meta extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "meta";
+    this.$tagName = "meta";
     this.initialize(config);
   }
 }
@@ -157,7 +157,7 @@ export class Meta extends Element {
 export class Style extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "style";
+    this.$tagName = "style";
     this.initialize(config, children);
   }
 }
@@ -165,7 +165,7 @@ export class Style extends Element {
 export class Title extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "title";
+    this.$tagName = "title";
     this.initialize(config, children);
   }
 }
@@ -173,7 +173,7 @@ export class Title extends Element {
 export class Body extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "body";
+    this.$tagName = "body";
     this.initialize(config, children);
   }
 }
@@ -181,7 +181,7 @@ export class Body extends Element {
 export class Address extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "address";
+    this.$tagName = "address";
     this.initialize(config, children);
   }
 }
@@ -189,7 +189,7 @@ export class Address extends Element {
 export class Article extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "article";
+    this.$tagName = "article";
     this.initialize(config, children);
   }
 }
@@ -197,7 +197,7 @@ export class Article extends Element {
 export class Aside extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "aside";
+    this.$tagName = "aside";
     this.initialize(config, children);
   }
 }
@@ -205,7 +205,7 @@ export class Aside extends Element {
 export class Footer extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "footer";
+    this.$tagName = "footer";
     this.initialize(config, children);
   }
 }
@@ -213,7 +213,7 @@ export class Footer extends Element {
 export class Header extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "header";
+    this.$tagName = "header";
     this.initialize(config, children);
   }
 }
@@ -221,7 +221,7 @@ export class Header extends Element {
 export class H1 extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "h1";
+    this.$tagName = "h1";
     this.initialize(config, children);
   }
 }
@@ -229,7 +229,7 @@ export class H1 extends Element {
 export class H2 extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "h2";
+    this.$tagName = "h2";
     this.initialize(config, children);
   }
 }
@@ -237,7 +237,7 @@ export class H2 extends Element {
 export class H3 extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "h3";
+    this.$tagName = "h3";
     this.initialize(config, children);
   }
 }
@@ -245,7 +245,7 @@ export class H3 extends Element {
 export class H4 extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "h4";
+    this.$tagName = "h4";
     this.initialize(config, children);
   }
 }
@@ -253,7 +253,7 @@ export class H4 extends Element {
 export class H5 extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "h5";
+    this.$tagName = "h5";
     this.initialize(config, children);
   }
 }
@@ -261,7 +261,7 @@ export class H5 extends Element {
 export class H6 extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "h6";
+    this.$tagName = "h6";
     this.initialize(config, children);
   }
 }
@@ -269,7 +269,7 @@ export class H6 extends Element {
 export class Hgroup extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "hgroup";
+    this.$tagName = "hgroup";
 
     if (!this.children) {
       this.children = [];
@@ -277,7 +277,7 @@ export class Hgroup extends Element {
 
     if (typeof config === "object" && !Array.isArray(config) && config.h) {
       const heading = new Element();
-      heading.tagName = `h${config.h}`;
+      heading.$tagName = `h${config.h}`;
       heading.initialize({
         textContent: config.textContent,
       });
@@ -323,7 +323,7 @@ export class Hgroup extends Element {
 export class Main extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "main";
+    this.$tagName = "main";
     this.initialize(config, children);
   }
 }
@@ -331,7 +331,7 @@ export class Main extends Element {
 export class Nav extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "nav";
+    this.$tagName = "nav";
     this.initialize(config, children);
   }
 }
@@ -339,7 +339,7 @@ export class Nav extends Element {
 export class Section extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "section";
+    this.$tagName = "section";
     this.initialize(config, children);
   }
 }
@@ -347,7 +347,7 @@ export class Section extends Element {
 export class Blockquote extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "blockquote";
+    this.$tagName = "blockquote";
     this.initialize(config, children);
   }
 }
@@ -355,7 +355,7 @@ export class Blockquote extends Element {
 export class Dd extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "dd";
+    this.$tagName = "dd";
     this.initialize(config, children);
   }
 }
@@ -363,7 +363,7 @@ export class Dd extends Element {
 export class Div extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "div";
+    this.$tagName = "div";
     this.initialize(config, children);
   }
 }
@@ -371,7 +371,7 @@ export class Div extends Element {
 export class Dl extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "dl";
+    this.$tagName = "dl";
     this.initialize(config, children);
   }
 }
@@ -379,7 +379,7 @@ export class Dl extends Element {
 export class Dt extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "dt";
+    this.$tagName = "dt";
     this.initialize(config, children);
   }
 }
@@ -387,7 +387,7 @@ export class Dt extends Element {
 export class Figcaption extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "figcaption";
+    this.$tagName = "figcaption";
     this.initialize(config, children);
   }
 }
@@ -395,7 +395,7 @@ export class Figcaption extends Element {
 export class Figure extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "figure";
+    this.$tagName = "figure";
     this.initialize(config, children);
   }
 }
@@ -403,7 +403,7 @@ export class Figure extends Element {
 export class Hr extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "hr";
+    this.$tagName = "hr";
     this.initialize(config);
   }
 }
@@ -411,7 +411,7 @@ export class Hr extends Element {
 export class Menu extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "menu";
+    this.$tagName = "menu";
     this.initialize(config, children);
   }
 }
@@ -419,7 +419,7 @@ export class Menu extends Element {
 export class P extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "p";
+    this.$tagName = "p";
     this.initialize(config, children);
   }
 }
@@ -427,7 +427,7 @@ export class P extends Element {
 export class Pre extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "pre";
+    this.$tagName = "pre";
     this.initialize(config, children);
   }
 }
@@ -454,7 +454,7 @@ export class ListElement extends Element {
 export class Ul extends ListElement {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "ul";
+    this.$tagName = "ul";
 
     this.initialize(config, children);
   }
@@ -463,7 +463,7 @@ export class Ul extends ListElement {
 export class Ol extends ListElement {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "ol";
+    this.$tagName = "ol";
 
     this.initialize(config, children);
   }
@@ -472,7 +472,7 @@ export class Ol extends ListElement {
 export class Li extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "li";
+    this.$tagName = "li";
     this.initialize(config, children);
   }
 }
@@ -480,7 +480,7 @@ export class Li extends Element {
 export class A extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "a";
+    this.$tagName = "a";
 
     // if the href is an external link, then add the noopener and noreferrer attributes
     if (
@@ -503,7 +503,7 @@ export class A extends Element {
 export class Abbr extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "abbr";
+    this.$tagName = "abbr";
     this.initialize(config, children);
   }
 }
@@ -511,7 +511,7 @@ export class Abbr extends Element {
 export class B extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "b";
+    this.$tagName = "b";
     this.initialize(config, children);
   }
 }
@@ -519,7 +519,7 @@ export class B extends Element {
 export class Bdi extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "bdi";
+    this.$tagName = "bdi";
     this.initialize(config, children);
   }
 }
@@ -527,7 +527,7 @@ export class Bdi extends Element {
 export class Bdo extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "bdo";
+    this.$tagName = "bdo";
     this.initialize(config, children);
   }
 }
@@ -535,7 +535,7 @@ export class Bdo extends Element {
 export class Br extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "br";
+    this.$tagName = "br";
     this.initialize(config);
   }
 }
@@ -543,7 +543,7 @@ export class Br extends Element {
 export class Cite extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "cite";
+    this.$tagName = "cite";
     this.initialize(config, children);
   }
 }
@@ -551,7 +551,7 @@ export class Cite extends Element {
 export class Code extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "code";
+    this.$tagName = "code";
     this.initialize(config, children);
   }
 }
@@ -559,7 +559,7 @@ export class Code extends Element {
 export class Data extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "data";
+    this.$tagName = "data";
     this.initialize(config, children);
   }
 }
@@ -567,7 +567,7 @@ export class Data extends Element {
 export class Dfn extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "dfn";
+    this.$tagName = "dfn";
     this.initialize(config, children);
   }
 }
@@ -575,7 +575,7 @@ export class Dfn extends Element {
 export class Em extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "em";
+    this.$tagName = "em";
     this.initialize(config, children);
   }
 }
@@ -583,7 +583,7 @@ export class Em extends Element {
 export class I extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "i";
+    this.$tagName = "i";
     this.initialize(config, children);
   }
 }
@@ -591,7 +591,7 @@ export class I extends Element {
 export class Kbd extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "kbd";
+    this.$tagName = "kbd";
     this.initialize(config, children);
   }
 }
@@ -599,7 +599,7 @@ export class Kbd extends Element {
 export class Mark extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "mark";
+    this.$tagName = "mark";
     this.initialize(config, children);
   }
 }
@@ -607,7 +607,7 @@ export class Mark extends Element {
 export class Q extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "q";
+    this.$tagName = "q";
     this.initialize(config, children);
   }
 }
@@ -615,7 +615,7 @@ export class Q extends Element {
 export class Rp extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "rp";
+    this.$tagName = "rp";
     this.initialize(config, children);
   }
 }
@@ -623,7 +623,7 @@ export class Rp extends Element {
 export class Rt extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "rt";
+    this.$tagName = "rt";
     this.initialize(config, children);
   }
 }
@@ -631,7 +631,7 @@ export class Rt extends Element {
 export class Ruby extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "ruby";
+    this.$tagName = "ruby";
     this.initialize(config, children);
   }
 }
@@ -639,7 +639,7 @@ export class Ruby extends Element {
 export class S extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "s";
+    this.$tagName = "s";
     this.initialize(config, children);
   }
 }
@@ -647,7 +647,7 @@ export class S extends Element {
 export class Samp extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "samp";
+    this.$tagName = "samp";
     this.initialize(config, children);
   }
 }
@@ -655,7 +655,7 @@ export class Samp extends Element {
 export class Small extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "small";
+    this.$tagName = "small";
     this.initialize(config, children);
   }
 }
@@ -663,7 +663,7 @@ export class Small extends Element {
 export class Span extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "span";
+    this.$tagName = "span";
     this.initialize(config, children);
   }
 }
@@ -671,7 +671,7 @@ export class Span extends Element {
 export class Strong extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "strong";
+    this.$tagName = "strong";
     this.initialize(config, children);
   }
 }
@@ -679,7 +679,7 @@ export class Strong extends Element {
 export class Sub extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "sub";
+    this.$tagName = "sub";
     this.initialize(config, children);
   }
 }
@@ -687,7 +687,7 @@ export class Sub extends Element {
 export class Sup extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "sup";
+    this.$tagName = "sup";
     this.initialize(config, children);
   }
 }
@@ -695,7 +695,7 @@ export class Sup extends Element {
 export class Time extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "time";
+    this.$tagName = "time";
     this.initialize(config, children);
   }
 }
@@ -703,7 +703,7 @@ export class Time extends Element {
 export class U extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "u";
+    this.$tagName = "u";
     this.initialize(config, children);
   }
 }
@@ -711,7 +711,7 @@ export class U extends Element {
 export class Var extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "var";
+    this.$tagName = "var";
     this.initialize(config, children);
   }
 }
@@ -719,7 +719,7 @@ export class Var extends Element {
 export class Wbr extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "wbr";
+    this.$tagName = "wbr";
     this.initialize(config);
   }
 }
@@ -727,7 +727,7 @@ export class Wbr extends Element {
 export class Area extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "area";
+    this.$tagName = "area";
     this.initialize(config);
   }
 }
@@ -735,7 +735,7 @@ export class Area extends Element {
 export class Audio extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "audio";
+    this.$tagName = "audio";
     this.initialize(config, children);
   }
 }
@@ -743,7 +743,7 @@ export class Audio extends Element {
 export class Img extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "img";
+    this.$tagName = "img";
     this.initialize(config);
   }
 }
@@ -758,7 +758,7 @@ export class LazyImg extends Img {
 export class Map extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "map";
+    this.$tagName = "map";
     this.initialize(config, children);
   }
 }
@@ -766,7 +766,7 @@ export class Map extends Element {
 export class Track extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "track";
+    this.$tagName = "track";
     this.initialize(config);
   }
 }
@@ -774,7 +774,7 @@ export class Track extends Element {
 export class Video extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "video";
+    this.$tagName = "video";
     this.initialize(config, children);
   }
 }
@@ -782,7 +782,7 @@ export class Video extends Element {
 export class Embed extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "embed";
+    this.$tagName = "embed";
     this.initialize(config);
   }
 }
@@ -790,7 +790,7 @@ export class Embed extends Element {
 export class Iframe extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "iframe";
+    this.$tagName = "iframe";
     this.initialize(config, children);
   }
 }
@@ -798,7 +798,7 @@ export class Iframe extends Element {
 export class Object extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "object";
+    this.$tagName = "object";
     this.initialize(config, children);
   }
 }
@@ -806,7 +806,7 @@ export class Object extends Element {
 export class Param extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "param";
+    this.$tagName = "param";
     this.initialize(config);
   }
 }
@@ -814,7 +814,7 @@ export class Param extends Element {
 export class Picture extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "picture";
+    this.$tagName = "picture";
     this.initialize(config, children);
   }
 }
@@ -822,7 +822,7 @@ export class Picture extends Element {
 export class Source extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "source";
+    this.$tagName = "source";
     this.initialize(config);
   }
 }
@@ -830,7 +830,7 @@ export class Source extends Element {
 export class Canvas extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "canvas";
+    this.$tagName = "canvas";
     this.initialize(config, children);
   }
 }
@@ -838,7 +838,7 @@ export class Canvas extends Element {
 export class Noscript extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "noscript";
+    this.$tagName = "noscript";
     this.initialize(config, children);
   }
 }
@@ -846,7 +846,7 @@ export class Noscript extends Element {
 export class Script extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "script";
+    this.$tagName = "script";
     this.defer = true;
     this.initialize(config, children);
   }
@@ -862,7 +862,7 @@ export class Module extends Script {
 export class Del extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "del";
+    this.$tagName = "del";
     this.initialize(config, children);
   }
 }
@@ -870,7 +870,7 @@ export class Del extends Element {
 export class Ins extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "ins";
+    this.$tagName = "ins";
     this.initialize(config, children);
   }
 }
@@ -878,7 +878,7 @@ export class Ins extends Element {
 export class Caption extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "caption";
+    this.$tagName = "caption";
     this.initialize(config, children);
   }
 }
@@ -886,7 +886,7 @@ export class Caption extends Element {
 export class Col extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "col";
+    this.$tagName = "col";
     this.initialize(config);
   }
 }
@@ -894,7 +894,7 @@ export class Col extends Element {
 export class Colgroup extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "colgroup";
+    this.$tagName = "colgroup";
     this.initialize(config, children);
   }
 }
@@ -902,7 +902,7 @@ export class Colgroup extends Element {
 export class Table extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "table";
+    this.$tagName = "table";
     this.initialize(config, children);
   }
 }
@@ -910,7 +910,7 @@ export class Table extends Element {
 export class TBody extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "tbody";
+    this.$tagName = "tbody";
     this.initialize(config, children);
   }
 }
@@ -918,7 +918,7 @@ export class TBody extends Element {
 export class Td extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "td";
+    this.$tagName = "td";
     this.initialize(config, children);
   }
 }
@@ -926,7 +926,7 @@ export class Td extends Element {
 export class Tfoot extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "tfoot";
+    this.$tagName = "tfoot";
     this.initialize(config, children);
   }
 }
@@ -934,7 +934,7 @@ export class Tfoot extends Element {
 export class Th extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "th";
+    this.$tagName = "th";
     this.initialize(config, children);
   }
 }
@@ -942,7 +942,7 @@ export class Th extends Element {
 export class THead extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "thead";
+    this.$tagName = "thead";
     this.initialize(config, children);
   }
 }
@@ -950,7 +950,7 @@ export class THead extends Element {
 export class Tr extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "tr";
+    this.$tagName = "tr";
     this.initialize(config, children);
   }
 }
@@ -958,7 +958,7 @@ export class Tr extends Element {
 export class Button extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "button";
+    this.$tagName = "button";
     this.initialize(config, children);
   }
 }
@@ -966,7 +966,7 @@ export class Button extends Element {
 export class Datalist extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "datalist";
+    this.$tagName = "datalist";
     this.initialize(config, children);
   }
 }
@@ -974,7 +974,7 @@ export class Datalist extends Element {
 export class Fieldset extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "fieldset";
+    this.$tagName = "fieldset";
     this.initialize(config, children);
   }
 }
@@ -982,7 +982,7 @@ export class Fieldset extends Element {
 export class Form extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "form";
+    this.$tagName = "form";
 
     // if no config or not an object, create an empty object
     if (!config || typeof config !== "object" || Array.isArray(config)) {
@@ -1000,7 +1000,7 @@ export class Form extends Element {
 export class Input extends Element {
   constructor(config) {
     super(config);
-    this.tagName = "input";
+    this.$tagName = "input";
     this.initialize(config);
   }
 }
@@ -1162,7 +1162,7 @@ export class ButtonInput extends Input {
 export class Label extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "label";
+    this.$tagName = "label";
     this.initialize(config, children);
   }
 }
@@ -1170,7 +1170,7 @@ export class Label extends Element {
 export class Legend extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "legend";
+    this.$tagName = "legend";
     this.initialize(config, children);
   }
 }
@@ -1178,7 +1178,7 @@ export class Legend extends Element {
 export class Meter extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "meter";
+    this.$tagName = "meter";
     this.initialize(config, children);
   }
 }
@@ -1186,7 +1186,7 @@ export class Meter extends Element {
 export class Optgroup extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "optgroup";
+    this.$tagName = "optgroup";
     this.initialize(config, children);
   }
 }
@@ -1194,7 +1194,7 @@ export class Optgroup extends Element {
 export class Option extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "option";
+    this.$tagName = "option";
     this.initialize(config, children);
   }
 }
@@ -1202,7 +1202,7 @@ export class Option extends Element {
 export class Output extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "output";
+    this.$tagName = "output";
     this.initialize(config, children);
   }
 }
@@ -1210,7 +1210,7 @@ export class Output extends Element {
 export class Progress extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "progress";
+    this.$tagName = "progress";
     this.initialize(config, children);
   }
 }
@@ -1218,7 +1218,7 @@ export class Progress extends Element {
 export class Select extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "select";
+    this.$tagName = "select";
     this.initialize(config, children);
   }
 }
@@ -1226,7 +1226,7 @@ export class Select extends Element {
 export class Textarea extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "textarea";
+    this.$tagName = "textarea";
     this.initialize(config, children);
   }
 }
@@ -1234,7 +1234,7 @@ export class Textarea extends Element {
 export class Details extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "details";
+    this.$tagName = "details";
     this.initialize(config, children);
   }
 }
@@ -1242,7 +1242,7 @@ export class Details extends Element {
 export class Dialog extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "dialog";
+    this.$tagName = "dialog";
     this.initialize(config, children);
   }
 }
@@ -1250,7 +1250,7 @@ export class Dialog extends Element {
 export class Summary extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "summary";
+    this.$tagName = "summary";
     this.initialize(config, children);
   }
 }
@@ -1258,7 +1258,7 @@ export class Summary extends Element {
 export class Slot extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "slot";
+    this.$tagName = "slot";
     this.initialize(config, children);
   }
 }
@@ -1266,7 +1266,7 @@ export class Slot extends Element {
 export class Template extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "template";
+    this.$tagName = "template";
     this.initialize(config, children);
   }
 }
@@ -1274,7 +1274,7 @@ export class Template extends Element {
 export class Svg extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "svg";
+    this.$tagName = "svg";
     this.version = "1.1";
     this.xmlns = "http://www.w3.org/2000/svg";
     this.initialize(config, children);
@@ -1284,7 +1284,7 @@ export class Svg extends Element {
 export class Circle extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "circle";
+    this.$tagName = "circle";
     this.initialize(config, children);
   }
 }
@@ -1292,7 +1292,7 @@ export class Circle extends Element {
 export class Ellipse extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "ellipse";
+    this.$tagName = "ellipse";
     this.initialize(config, children);
   }
 }
@@ -1300,7 +1300,7 @@ export class Ellipse extends Element {
 export class Line extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "line";
+    this.$tagName = "line";
     this.initialize(config, children);
   }
 }
@@ -1308,7 +1308,7 @@ export class Line extends Element {
 export class Path extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "path";
+    this.$tagName = "path";
     this.initialize(config, children);
   }
 }
@@ -1316,7 +1316,7 @@ export class Path extends Element {
 export class Polygon extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "polygon";
+    this.$tagName = "polygon";
     this.initialize(config, children);
   }
 }
@@ -1324,7 +1324,7 @@ export class Polygon extends Element {
 export class Polyline extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "polyline";
+    this.$tagName = "polyline";
     this.initialize(config, children);
   }
 }
@@ -1332,7 +1332,7 @@ export class Polyline extends Element {
 export class Rect extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "rect";
+    this.$tagName = "rect";
     this.initialize(config, children);
   }
 }
@@ -1340,7 +1340,7 @@ export class Rect extends Element {
 export class Text extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "text";
+    this.$tagName = "text";
     this.initialize(config, children);
   }
 }
@@ -1348,7 +1348,7 @@ export class Text extends Element {
 export class Tspan extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "tspan";
+    this.$tagName = "tspan";
     this.initialize(config, children);
   }
 }
@@ -1356,7 +1356,7 @@ export class Tspan extends Element {
 export class G extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "g";
+    this.$tagName = "g";
     this.initialize(config, children);
   }
 }
@@ -1364,7 +1364,7 @@ export class G extends Element {
 export class Defs extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "defs";
+    this.$tagName = "defs";
     this.initialize(config, children);
   }
 }
@@ -1372,7 +1372,7 @@ export class Defs extends Element {
 export class LinearGradient extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "linearGradient";
+    this.$tagName = "linearGradient";
     this.initialize(config, children);
   }
 }
@@ -1380,7 +1380,7 @@ export class LinearGradient extends Element {
 export class RadialGradient extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "radialGradient";
+    this.$tagName = "radialGradient";
     this.initialize(config, children);
   }
 }
@@ -1388,7 +1388,7 @@ export class RadialGradient extends Element {
 export class Stop extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "stop";
+    this.$tagName = "stop";
     this.initialize(config, children);
   }
 }
@@ -1396,7 +1396,7 @@ export class Stop extends Element {
 export class Use extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "use";
+    this.$tagName = "use";
     this.initialize(config, children);
   }
 }
@@ -1404,7 +1404,7 @@ export class Use extends Element {
 export class Symbol extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "symbol";
+    this.$tagName = "symbol";
     this.initialize(config, children);
   }
 }
@@ -1412,7 +1412,7 @@ export class Symbol extends Element {
 export class ClipPath extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "clipPath";
+    this.$tagName = "clipPath";
     this.initialize(config, children);
   }
 }
@@ -1420,7 +1420,7 @@ export class ClipPath extends Element {
 export class Pattern extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "pattern";
+    this.$tagName = "pattern";
     this.initialize(config, children);
   }
 }
@@ -1428,7 +1428,7 @@ export class Pattern extends Element {
 export class Mask extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "mask";
+    this.$tagName = "mask";
     this.initialize(config, children);
   }
 }
@@ -1436,7 +1436,7 @@ export class Mask extends Element {
 export class Filter extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "filter";
+    this.$tagName = "filter";
     this.initialize(config, children);
   }
 }
@@ -1444,7 +1444,7 @@ export class Filter extends Element {
 export class FeGaussianBlur extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feGaussianBlur";
+    this.$tagName = "feGaussianBlur";
     this.initialize(config, children);
   }
 }
@@ -1452,7 +1452,7 @@ export class FeGaussianBlur extends Element {
 export class FeOffset extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feOffset";
+    this.$tagName = "feOffset";
     this.initialize(config, children);
   }
 }
@@ -1460,7 +1460,7 @@ export class FeOffset extends Element {
 export class FeBlend extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feBlend";
+    this.$tagName = "feBlend";
     this.initialize(config, children);
   }
 }
@@ -1468,7 +1468,7 @@ export class FeBlend extends Element {
 export class FeColorMatrix extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feColorMatrix";
+    this.$tagName = "feColorMatrix";
     this.initialize(config, children);
   }
 }
@@ -1476,7 +1476,7 @@ export class FeColorMatrix extends Element {
 export class FeComponentTransfer extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feComponentTransfer";
+    this.$tagName = "feComponentTransfer";
     this.initialize(config, children);
   }
 }
@@ -1484,7 +1484,7 @@ export class FeComponentTransfer extends Element {
 export class FeComposite extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feComposite";
+    this.$tagName = "feComposite";
     this.initialize(config, children);
   }
 }
@@ -1492,7 +1492,7 @@ export class FeComposite extends Element {
 export class FeConvolveMatrix extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feConvolveMatrix";
+    this.$tagName = "feConvolveMatrix";
     this.initialize(config, children);
   }
 }
@@ -1500,7 +1500,7 @@ export class FeConvolveMatrix extends Element {
 export class FeDiffuseLighting extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feDiffuseLighting";
+    this.$tagName = "feDiffuseLighting";
     this.initialize(config, children);
   }
 }
@@ -1508,7 +1508,7 @@ export class FeDiffuseLighting extends Element {
 export class FeDisplacementMap extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feDisplacementMap";
+    this.$tagName = "feDisplacementMap";
     this.initialize(config, children);
   }
 }
@@ -1516,7 +1516,7 @@ export class FeDisplacementMap extends Element {
 export class FeFlood extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feFlood";
+    this.$tagName = "feFlood";
     this.initialize(config, children);
   }
 }
@@ -1524,7 +1524,7 @@ export class FeFlood extends Element {
 export class FeImage extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feImage";
+    this.$tagName = "feImage";
     this.initialize(config, children);
   }
 }
@@ -1532,7 +1532,7 @@ export class FeImage extends Element {
 export class FeMerge extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feMerge";
+    this.$tagName = "feMerge";
     this.initialize(config, children);
   }
 }
@@ -1540,7 +1540,7 @@ export class FeMerge extends Element {
 export class FeMorphology extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feMorphology";
+    this.$tagName = "feMorphology";
     this.initialize(config, children);
   }
 }
@@ -1548,7 +1548,7 @@ export class FeMorphology extends Element {
 export class FeSpecularLighting extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feSpecularLighting";
+    this.$tagName = "feSpecularLighting";
     this.initialize(config, children);
   }
 }
@@ -1556,7 +1556,7 @@ export class FeSpecularLighting extends Element {
 export class FeTile extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feTile";
+    this.$tagName = "feTile";
     this.initialize(config, children);
   }
 }
@@ -1564,7 +1564,7 @@ export class FeTile extends Element {
 export class FeTurbulence extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "feTurbulence";
+    this.$tagName = "feTurbulence";
     this.initialize(config, children);
   }
 }
@@ -1572,7 +1572,7 @@ export class FeTurbulence extends Element {
 export class Math extends Element {
   constructor(config, children) {
     super(config, children);
-    this.tagName = "math";
+    this.$tagName = "math";
     this.initialize(config, children);
   }
 }

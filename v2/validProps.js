@@ -442,6 +442,9 @@ export const validHTMLAttributes = [
 ];
 
 export const validDOMProperties = [
+  // Basic element propertiies (string)
+  "$tagName", // string - element tag name for creating new elements
+
   // Content properties (string)
   "$textContent", // string - sets text content (escapes HTML)
   "$innerHTML", // string - sets HTML content (parses HTML)
