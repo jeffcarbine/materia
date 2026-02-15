@@ -38,6 +38,23 @@ if (isServer) {
   document = window.document;
 }
 
+// Symbol to mark import objects
+const IMPORT_MARKER = Symbol("materiaImport");
+
+/**
+ * Helper function to mark component imports for client-side resolution
+ * @param {*} component - The component or value to import
+ * @param {string} path - The path to import from
+ * @returns {Object} An object marked for import processing
+ */
+export function $import(component, path) {
+  return {
+    [IMPORT_MARKER]: true,
+    component,
+    path,
+  };
+}
+
 /**
  * The main MateriaJS class.
  * @class Materia
@@ -841,12 +858,10 @@ class MateriaJS {
     for (let key in imports) {
       if (typeof imports[key] === "function") {
         imports[key] = this.#stringifyFunction(imports[key]);
-      } else if (Array.isArray(imports[key])) {
-        // Handle array format: [Component, "/path"]
-        if (imports[key].length === 2 && typeof imports[key][1] === "string") {
-          if (!imports[key][1].startsWith(IMPORT_PREFIX)) {
-            imports[key][1] = `${IMPORT_PREFIX}${imports[key][1]}`;
-          }
+      } else if (imports[key] && imports[key][IMPORT_MARKER] === true) {
+        // Handle $import format: $import(Component, "/path")
+        if (imports[key].path && !imports[key].path.startsWith(IMPORT_PREFIX)) {
+          imports[key].path = `${IMPORT_PREFIX}${imports[key].path}`;
         }
       }
     }
@@ -947,43 +962,41 @@ class MateriaJS {
 
   async #resolveIncompleteImports(imports) {
     for (let key in imports) {
-      if (Array.isArray(imports[key])) {
-        // Handle array format: [Component, "import::/path"]
-        if (imports[key].length === 2 && typeof imports[key][1] === "string") {
-          if (imports[key][1].startsWith(IMPORT_PREFIX)) {
-            let path = imports[key][1].replace(IMPORT_PREFIX, "");
+      if (imports[key] && imports[key][IMPORT_MARKER] === true) {
+        // Handle $import format: $import(Component, "import::/path")
+        if (imports[key].path && imports[key].path.startsWith(IMPORT_PREFIX)) {
+          let path = imports[key].path.replace(IMPORT_PREFIX, "");
 
-            // Sanitize the path before importing
-            path = this.#sanitizePath(path);
-            if (!path) {
-              imports[key] = null; // Set to null if the path is invalid
-              continue;
-            }
+          // Sanitize the path before importing
+          path = this.#sanitizePath(path);
+          if (!path) {
+            imports[key] = null; // Set to null if the path is invalid
+            continue;
+          }
 
-            // Check if the component is already imported
-            if (this.#importCache[path]) {
-              imports[key] =
-                this.#importCache[path][key] || this.#importCache[path].default;
-            } else {
-              try {
-                // Dynamically import the component
-                const module = await import(path);
+          // Check if the component is already imported
+          if (this.#importCache[path]) {
+            imports[key] =
+              this.#importCache[path][key] || this.#importCache[path].default;
+          } else {
+            try {
+              // Dynamically import the component
+              const module = await import(path);
 
-                // Cache the imported module
-                this.#importCache[path] = module;
+              // Cache the imported module
+              this.#importCache[path] = module;
 
-                // Check for named export or default export
-                const component = module[key] || module.default;
+              // Check for named export or default export
+              const component = module[key] || module.default;
 
-                if (component) {
-                  imports[key] = component;
-                } else {
-                  console.error(`Component ${key} not found in ${path}`);
-                }
-              } catch (error) {
-                console.error(`Error importing ${path}:`, error);
-                imports[key] = null; // Fallback: Set imports[key] to null
+              if (component) {
+                imports[key] = component;
+              } else {
+                console.error(`Component ${key} not found in ${path}`);
               }
+            } catch (error) {
+              console.error(`Error importing ${path}:`, error);
+              imports[key] = null; // Fallback: Set imports[key] to null
             }
           }
         }
@@ -1072,7 +1085,7 @@ class MateriaJS {
       data = this.get(binding);
     }
 
-    value = func(data, imports, elements);
+    value = func(data, imports, elements, $import);
 
     // Always resolve element by handlerId
     if (typeof element === "string") {
@@ -1336,7 +1349,7 @@ class MateriaJS {
             try {
               if (imports)
                 imports = await this.#resolveIncompleteImports(imports);
-              func(match, imports, elements, event);
+              func(match, imports, elements, event, $import);
             } catch (error) {
               console.error("Error executing event handler:", error);
             }
@@ -1371,7 +1384,7 @@ class MateriaJS {
           delegate.func = func;
         }
 
-        func(target, imports, elements);
+        func(target, imports, elements, $import);
       });
     }
   }
@@ -1855,9 +1868,9 @@ class MateriaJS {
       for (const key in imports) {
         const value = imports[key];
 
-        if (Array.isArray(value) && value.length === 2) {
-          // Handle array format: [Component, "/path"]
-          clientImports[key] = value[0];
+        if (value && value[IMPORT_MARKER] === true) {
+          // Handle $import format: $import(Component, "/path")
+          clientImports[key] = value.component;
         } else {
           clientImports[key] = value;
         }
@@ -1884,9 +1897,9 @@ class MateriaJS {
       if (imports) {
         for (const key in imports) {
           const value = imports[key];
-          if (Array.isArray(value) && value.length === 2) {
-            // Handle array format: [Component, "/path"]
-            imports[key] = value[1];
+          if (value && value[IMPORT_MARKER] === true) {
+            // Handle $import format: $import(Component, "/path")
+            imports[key] = value.path;
           } else {
             imports[key] = value;
           }
@@ -1953,7 +1966,7 @@ class MateriaJS {
       data = this.get(binding);
     }
 
-    const result = preservedFunc(data, clientImports, elements);
+    const result = preservedFunc(data, clientImports, elements, $import);
 
     if (result !== null) {
       this.#setElementAttributesAndProperties(element, property, result, depth);
