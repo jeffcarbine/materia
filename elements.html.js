@@ -1,134 +1,134 @@
 import {
-  validAttributes,
+  validHTMLAttributes,
+  validDOMProperties,
   validEvents,
   validMutations,
   validMateriaProps,
-} from "materiajs/attributes";
-
-const validProps = [
-  ...validAttributes,
-  ...validEvents,
-  ...validMutations,
-  ...validMateriaProps,
-];
+} from "materiajs/validProps";
 
 export class Element {
-  initialize(params = {}) {
-    if (typeof params === "object") {
-      if (Array.isArray(params)) {
-        this.handleArrayParams(params);
-      } else if (params instanceof Element) {
-        this.child = params;
+  initialize(config = {}, children = null) {
+    if (typeof config === "object") {
+      if (Array.isArray(config)) {
+        // if it is an array, then it is handled as children
+        this.handleChildren(config);
+      } else if (config instanceof Element) {
+        // if it is an element, then it is handled as a single child
+        this.handleChildren([config]);
       } else {
-        this.handleObjectParams(params);
+        // otherwise, it is handled properly as a config
+        this.handleObjectConfig(config);
       }
     } else {
-      this.handlePrimitiveParams(params);
+      // if it is a primitive value, then it is handled uniquely based on the Element type
+      this.handlePrimitiveConfig(config);
+    }
+
+    if (children) {
+      // check if the children is an array, if not wrap it in an array
+      if (!Array.isArray(children)) {
+        children = [children];
+      }
+
+      this.handleChildren(children);
     }
   }
 
-  handleArrayParams(params) {
-    const tagHandlers = {
-      ul: (item) => (item instanceof Li ? item : new Li(item)),
-      ol: (item) => (item instanceof Li ? item : new Li(item)),
-      dl: (item) => (item instanceof Dt ? item : new Dt(item)),
-      select: (item) => (item instanceof Option ? item : new Option(item)),
-      thead: (params) =>
-        new Tr(
-          params.map((cell) => (cell instanceof Th ? cell : new Th(cell)))
-        ),
-      tbody: (params) =>
-        params.map(
-          (row) =>
-            new Tr(
-              row.map((cell, index) =>
-                index === 0
-                  ? cell instanceof Th
-                    ? cell
-                    : new Th(cell)
-                  : cell instanceof Td
-                  ? cell
-                  : new Td(cell)
-              )
-            )
-        ),
-    };
-
-    if (tagHandlers[this.tagName]) {
-      this.children = params.map(tagHandlers[this.tagName]);
+  handleChildren(arr) {
+    if (!this.children) {
+      this.children = arr;
+    } else if (typeof this.children === "object") {
+      if (Array.isArray(this.children)) {
+        // if it is an array, spread it and the new array into a new array
+        this.children = [...arr, ...this.children];
+      } else {
+        // otherwise it's an object and we can wrap it and spread the new array
+        this.children = [...arr, this.children];
+      }
     } else {
-      this.children = params;
+      // if it's a primitive value, then wrap it in a Div and spread the new array
+      this.children = [...arr, new Div(this.children)];
     }
   }
 
-  handleObjectParams(params) {
-    for (let key in params) {
-      if (
-        validProps.includes(key) ||
-        key.startsWith("data-") ||
-        key.startsWith("attributes:") ||
-        key.startsWith("keydown:")
-      ) {
-        this[key] = params[key];
+  handleObjectConfig(config) {
+    const validProps = [
+      ...validHTMLAttributes,
+      ...validDOMProperties,
+      ...validMateriaProps,
+    ];
+    const validEventsAndMutations = [...validEvents, ...validMutations];
+
+    for (let key in config) {
+      // Default value if it's a valid prop directly (attributes, DOM props, materia props, data attributes)
+      let isValid = validProps.includes(key) || key.startsWith("data");
+
+      // Check if it's an event with __ prefix (events with preventDefault)
+      if (key.startsWith("__")) {
+        const eventName = key.slice(2);
+        isValid =
+          validEvents.includes(eventName) || eventName.startsWith("keydown:");
+      }
+      // Check if it's an event with _ prefix (events with no preventDefault and mutations)
+      else if (key.startsWith("_")) {
+        const eventName = key.slice(1);
+        isValid =
+          validEventsAndMutations.includes(eventName) ||
+          eventName.startsWith("keydown:") ||
+          eventName.startsWith("attributes:");
+      }
+
+      if (isValid) {
+        this[key] = config[key];
       }
     }
   }
 
-  handlePrimitiveParams(params) {
+  handlePrimitiveConfig(config) {
     const primitiveHandlers = {
-      img: (params) => (this.src = params),
-      script: (params) => (this.src = params),
-      link: (params) => (this.href = params),
-      default: (params) => (this.textContent = params),
+      img: (config) => (this.src = config),
+      script: (config) => (this.src = config),
+      link: (config) => (this.href = config),
+      default: (config) => (this.textContent = config),
     };
 
-    (primitiveHandlers[this.tagName] || primitiveHandlers.default)(params);
+    (primitiveHandlers[this.$tagName] || primitiveHandlers.default)(config);
   }
-
-  classList = {
-    add: (className) => {
-      if (!this.class) {
-        this.class = className;
-      } else if (!this.class.includes(className)) {
-        this.class += ` ${className}`;
-      }
-    },
-  };
 }
 
 export class Html extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "html";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "html";
+    this.initialize(config, children);
   }
 }
 export class Head extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "head";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "head";
+    this.initialize(config, children);
   }
 }
 
 export class Link extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "link";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "link";
+    this.initialize(config);
   }
 }
 
 export class Stylesheet extends Link {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.rel = "stylesheet";
   }
 }
 
 export class PreLoadStyle extends Link {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.rel = "preload";
     this.as = "style";
     this.onload = "this.onload=null;this.rel='stylesheet'";
@@ -136,1414 +136,1432 @@ export class PreLoadStyle extends Link {
 }
 
 export class Meta extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "meta";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "meta";
+    this.initialize(config);
   }
 }
 
 export class Style extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "style";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "style";
+    this.initialize(config, children);
   }
 }
 
 export class Title extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "title";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "title";
+    this.initialize(config, children);
   }
 }
 
 export class Body extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "body";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "body";
+    this.initialize(config, children);
   }
 }
 
 export class Address extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "address";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "address";
+    this.initialize(config, children);
   }
 }
 
 export class Article extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "article";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "article";
+    this.initialize(config, children);
   }
 }
 
 export class Aside extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "aside";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "aside";
+    this.initialize(config, children);
   }
 }
 
 export class Footer extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "footer";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "footer";
+    this.initialize(config, children);
   }
 }
 
 export class Header extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "header";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "header";
+    this.initialize(config, children);
   }
 }
 
 export class H1 extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "h1";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "h1";
+    this.initialize(config, children);
   }
 }
 
 export class H2 extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "h2";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "h2";
+    this.initialize(config, children);
   }
 }
 
 export class H3 extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "h3";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "h3";
+    this.initialize(config, children);
   }
 }
 
 export class H4 extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "h4";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "h4";
+    this.initialize(config, children);
   }
 }
 
 export class H5 extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "h5";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "h5";
+    this.initialize(config, children);
   }
 }
 
 export class H6 extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "h6";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "h6";
+    this.initialize(config, children);
   }
 }
 
 export class Hgroup extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "hgroup";
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "hgroup";
 
     if (!this.children) {
       this.children = [];
     }
 
-    if (params.h) {
+    if (typeof config === "object" && !Array.isArray(config) && config.h) {
       const heading = new Element();
-      heading.tagName = `h${params.h}`;
+      heading.$tagName = `h${config.h}`;
       heading.initialize({
-        textContent: params.textContent,
+        textContent: config.textContent,
       });
 
       this.children.push(heading);
 
-      delete params.h;
-      delete params.textContent;
+      delete config.h;
+      delete config.textContent;
     }
 
-    if (params.subheading) {
+    if (
+      typeof config === "object" &&
+      !Array.isArray(config) &&
+      config.subheading
+    ) {
       this.children.push(
         new P({
-          textContent: params.subheading,
-        })
+          textContent: config.subheading,
+        }),
       );
 
-      delete params.subheading;
+      delete config.subheading;
     }
 
-    if (params.preheading) {
+    if (
+      typeof config === "object" &&
+      !Array.isArray(config) &&
+      config.preheading
+    ) {
       this.children.unshift(
         new P({
-          textContent: params.preheading,
-        })
+          textContent: config.preheading,
+        }),
       );
 
-      delete params.preheading;
+      delete config.preheading;
     }
 
-    this.initialize(params);
+    this.initialize(config, children);
   }
 }
 
 export class Main extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "main";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "main";
+    this.initialize(config, children);
   }
 }
 
 export class Nav extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "nav";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "nav";
+    this.initialize(config, children);
   }
 }
 
 export class Section extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "section";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "section";
+    this.initialize(config, children);
   }
 }
 
 export class Blockquote extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "blockquote";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "blockquote";
+    this.initialize(config, children);
   }
 }
 
 export class Dd extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "dd";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "dd";
+    this.initialize(config, children);
   }
 }
 
 export class Div extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "div";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "div";
+    this.initialize(config, children);
   }
 }
 
 export class Dl extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "dl";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "dl";
+    this.initialize(config, children);
   }
 }
 
 export class Dt extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "dt";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "dt";
+    this.initialize(config, children);
   }
 }
 
 export class Figcaption extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "figcaption";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "figcaption";
+    this.initialize(config, children);
   }
 }
 
 export class Figure extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "figure";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "figure";
+    this.initialize(config, children);
   }
 }
 
 export class Hr extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "hr";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "hr";
+    this.initialize(config);
   }
 }
 
 export class Menu extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "menu";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "menu";
+    this.initialize(config, children);
   }
 }
 
 export class P extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "p";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "p";
+    this.initialize(config, children);
   }
 }
 
 export class Pre extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "pre";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "pre";
+    this.initialize(config, children);
   }
 }
 
 export class ListElement extends Element {
-  constructor(params) {
-    super(params);
+  constructor(config, children) {
+    super(config, children);
 
-    // if we have params.children
-    if (params.children && Array.isArray(params.children)) {
+    // if we have config.children
+    if (
+      typeof config === "object" &&
+      !Array.isArray(config) &&
+      config.children &&
+      Array.isArray(config.children)
+    ) {
       // ensure that they are all wrapped in Li elements
-      params.children = params.children.map((child) =>
-        child instanceof Li ? child : new Li(child)
+      config.children = config.children.map((child) =>
+        child instanceof Li ? child : new Li(child),
       );
     }
   }
 }
 
 export class Ul extends ListElement {
-  constructor(params) {
-    super(params);
-    this.tagName = "ul";
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "ul";
 
-    this.initialize(params);
+    this.initialize(config, children);
   }
 }
 
 export class Ol extends ListElement {
-  constructor(params) {
-    super(params);
-    this.tagName = "ol";
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "ol";
 
-    this.initialize(params);
+    this.initialize(config, children);
   }
 }
 
 export class Li extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "li";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "li";
+    this.initialize(config, children);
   }
 }
 
 export class A extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "a";
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "a";
 
     // if the href is an external link, then add the noopener and noreferrer attributes
-    if (params.href && params.href.startsWith("http")) {
-      if (!params.rel) {
-        params.rel = "noopener noreferrer";
-      } else if (!params.rel.includes("noopener noreferrer")) {
-        params.rel += " noopener noreferrer";
+    if (
+      typeof config === "object" &&
+      !Array.isArray(config) &&
+      config.href &&
+      config.href.startsWith("http")
+    ) {
+      if (!config.rel) {
+        config.rel = "noopener noreferrer";
+      } else if (!config.rel.includes("noopener noreferrer")) {
+        config.rel += " noopener noreferrer";
       }
     }
 
-    this.initialize(params);
+    this.initialize(config, children);
   }
 }
 
 export class Abbr extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "abbr";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "abbr";
+    this.initialize(config, children);
   }
 }
 
 export class B extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "b";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "b";
+    this.initialize(config, children);
   }
 }
 
 export class Bdi extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "bdi";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "bdi";
+    this.initialize(config, children);
   }
 }
 
 export class Bdo extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "bdo";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "bdo";
+    this.initialize(config, children);
   }
 }
 
 export class Br extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "br";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "br";
+    this.initialize(config);
   }
 }
 
 export class Cite extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "cite";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "cite";
+    this.initialize(config, children);
   }
 }
 
 export class Code extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "code";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "code";
+    this.initialize(config, children);
   }
 }
 
 export class Data extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "data";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "data";
+    this.initialize(config, children);
   }
 }
 
 export class Dfn extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "dfn";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "dfn";
+    this.initialize(config, children);
   }
 }
 
 export class Em extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "em";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "em";
+    this.initialize(config, children);
   }
 }
 
 export class I extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "i";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "i";
+    this.initialize(config, children);
   }
 }
 
 export class Kbd extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "kbd";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "kbd";
+    this.initialize(config, children);
   }
 }
 
 export class Mark extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "mark";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "mark";
+    this.initialize(config, children);
   }
 }
 
 export class Q extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "q";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "q";
+    this.initialize(config, children);
   }
 }
 
 export class Rp extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "rp";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "rp";
+    this.initialize(config, children);
   }
 }
 
 export class Rt extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "rt";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "rt";
+    this.initialize(config, children);
   }
 }
 
 export class Ruby extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "ruby";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "ruby";
+    this.initialize(config, children);
   }
 }
 
 export class S extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "s";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "s";
+    this.initialize(config, children);
   }
 }
 
 export class Samp extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "samp";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "samp";
+    this.initialize(config, children);
   }
 }
 
 export class Small extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "small";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "small";
+    this.initialize(config, children);
   }
 }
 
 export class Span extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "span";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "span";
+    this.initialize(config, children);
   }
 }
 
 export class Strong extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "strong";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "strong";
+    this.initialize(config, children);
   }
 }
 
 export class Sub extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "sub";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "sub";
+    this.initialize(config, children);
   }
 }
 
 export class Sup extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "sup";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "sup";
+    this.initialize(config, children);
   }
 }
 
 export class Time extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "time";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "time";
+    this.initialize(config, children);
   }
 }
 
 export class U extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "u";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "u";
+    this.initialize(config, children);
   }
 }
 
 export class Var extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "var";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "var";
+    this.initialize(config, children);
   }
 }
 
 export class Wbr extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "wbr";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "wbr";
+    this.initialize(config);
   }
 }
 
 export class Area extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "area";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "area";
+    this.initialize(config);
   }
 }
 
 export class Audio extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "audio";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "audio";
+    this.initialize(config, children);
   }
 }
 
 export class Img extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "img";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "img";
+    this.initialize(config);
   }
 }
 
 export class LazyImg extends Img {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.loading = "lazy";
   }
 }
 
 export class Map extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "map";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "map";
+    this.initialize(config, children);
   }
 }
 
 export class Track extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "track";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "track";
+    this.initialize(config);
   }
 }
 
 export class Video extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "video";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "video";
+    this.initialize(config, children);
   }
 }
 
 export class Embed extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "embed";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "embed";
+    this.initialize(config);
   }
 }
 
 export class Iframe extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "iframe";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "iframe";
+    this.initialize(config, children);
   }
 }
 
 export class Object extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "object";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "object";
+    this.initialize(config, children);
   }
 }
 
 export class Param extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "param";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "param";
+    this.initialize(config);
   }
 }
 
 export class Picture extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "picture";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "picture";
+    this.initialize(config, children);
   }
 }
 
 export class Source extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "source";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "source";
+    this.initialize(config);
   }
 }
 
 export class Canvas extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "canvas";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "canvas";
+    this.initialize(config, children);
   }
 }
 
 export class Noscript extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "noscript";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "noscript";
+    this.initialize(config, children);
   }
 }
 
 export class Script extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "script";
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "script";
     this.defer = true;
-    this.initialize(params);
+    this.initialize(config, children);
   }
 }
 
 export class Module extends Script {
-  constructor(params) {
-    super(params);
+  constructor(config, children) {
+    super(config, children);
     this.type = "module";
   }
 }
 
 export class Del extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "del";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "del";
+    this.initialize(config, children);
   }
 }
 
 export class Ins extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "ins";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "ins";
+    this.initialize(config, children);
   }
 }
 
 export class Caption extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "caption";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "caption";
+    this.initialize(config, children);
   }
 }
 
 export class Col extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "col";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "col";
+    this.initialize(config);
   }
 }
 
 export class Colgroup extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "colgroup";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "colgroup";
+    this.initialize(config, children);
   }
 }
 
 export class Table extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "table";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "table";
+    this.initialize(config, children);
   }
 }
 
 export class TBody extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "tbody";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "tbody";
+    this.initialize(config, children);
   }
 }
 
 export class Td extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "td";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "td";
+    this.initialize(config, children);
   }
 }
 
 export class Tfoot extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "tfoot";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "tfoot";
+    this.initialize(config, children);
   }
 }
 
 export class Th extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "th";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "th";
+    this.initialize(config, children);
   }
 }
 
 export class THead extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "thead";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "thead";
+    this.initialize(config, children);
   }
 }
 
 export class Tr extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "tr";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "tr";
+    this.initialize(config, children);
   }
 }
 
 export class Button extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "button";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "button";
+    this.initialize(config, children);
   }
 }
 
 export class Datalist extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "datalist";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "datalist";
+    this.initialize(config, children);
   }
 }
 
 export class Fieldset extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "fieldset";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "fieldset";
+    this.initialize(config, children);
   }
 }
 
 export class Form extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "form";
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "form";
 
-    // if no params, create an empty object
-    if (!params) {
-      params = {};
+    // if no config or not an object, create an empty object
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      config = {};
     }
 
-    if (!params?.method) {
-      params.method = "POST";
+    if (!config?.method) {
+      config.method = "POST";
     }
 
-    this.initialize(params);
+    this.initialize(config, children);
   }
 }
 
 export class Input extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "input";
-    this.initialize(params);
+  constructor(config) {
+    super(config);
+    this.$tagName = "input";
+    this.initialize(config);
   }
 }
 
 export class HiddenInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "hidden";
   }
 }
 
 export class TextInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "text";
   }
 }
 
 export class SearchInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "search";
   }
 }
 
 export class TelInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "tel";
   }
 }
 
 export class UrlInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "url";
   }
 }
 
 export class EmailInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "email";
   }
 }
 
 export class PasswordInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "password";
   }
 }
 
 export class DateInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "date";
   }
 }
 
 export class MonthInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "month";
   }
 }
 
 export class WeekInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "week";
   }
 }
 
 export class TimeInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "time";
   }
 }
 
 export class DatetimeLocalInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "datetime-local";
   }
 }
 
 export class NumberInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "number";
   }
 }
 
 export class RangeInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "range";
   }
 }
 
 export class ColorInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "color";
   }
 }
 
 export class CheckboxInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "checkbox";
   }
 }
 
 export class RadioInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "radio";
   }
 }
 
 export class FileInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "file";
   }
 }
 
 export class SubmitInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "submit";
   }
 }
 
 export class ImageInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "image";
   }
 }
 
 export class ResetInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "reset";
   }
 }
 
 export class ButtonInput extends Input {
-  constructor(params) {
-    super(params);
+  constructor(config) {
+    super(config);
     this.type = "button";
   }
 }
 
 export class Label extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "label";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "label";
+    this.initialize(config, children);
   }
 }
 
 export class Legend extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "legend";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "legend";
+    this.initialize(config, children);
   }
 }
 
 export class Meter extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "meter";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "meter";
+    this.initialize(config, children);
   }
 }
 
 export class Optgroup extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "optgroup";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "optgroup";
+    this.initialize(config, children);
   }
 }
 
 export class Option extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "option";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "option";
+    this.initialize(config, children);
   }
 }
 
 export class Output extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "output";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "output";
+    this.initialize(config, children);
   }
 }
 
 export class Progress extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "progress";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "progress";
+    this.initialize(config, children);
   }
 }
 
 export class Select extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "select";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "select";
+    this.initialize(config, children);
   }
 }
 
 export class Textarea extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "textarea";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "textarea";
+    this.initialize(config, children);
   }
 }
 
 export class Details extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "details";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "details";
+    this.initialize(config, children);
   }
 }
 
 export class Dialog extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "dialog";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "dialog";
+    this.initialize(config, children);
   }
 }
 
 export class Summary extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "summary";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "summary";
+    this.initialize(config, children);
   }
 }
 
 export class Slot extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "slot";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "slot";
+    this.initialize(config, children);
   }
 }
 
 export class Template extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "template";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "template";
+    this.initialize(config, children);
   }
 }
 
 export class Svg extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "svg";
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "svg";
     this.version = "1.1";
     this.xmlns = "http://www.w3.org/2000/svg";
-    this.initialize(params);
+    this.initialize(config, children);
   }
 }
 
 export class Circle extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "circle";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "circle";
+    this.initialize(config, children);
   }
 }
 
 export class Ellipse extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "ellipse";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "ellipse";
+    this.initialize(config, children);
   }
 }
 
 export class Line extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "line";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "line";
+    this.initialize(config, children);
   }
 }
 
 export class Path extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "path";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "path";
+    this.initialize(config, children);
   }
 }
 
 export class Polygon extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "polygon";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "polygon";
+    this.initialize(config, children);
   }
 }
 
 export class Polyline extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "polyline";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "polyline";
+    this.initialize(config, children);
   }
 }
 
 export class Rect extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "rect";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "rect";
+    this.initialize(config, children);
   }
 }
 
 export class Text extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "text";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "text";
+    this.initialize(config, children);
   }
 }
 
 export class Tspan extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "tspan";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "tspan";
+    this.initialize(config, children);
   }
 }
 
 export class G extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "g";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "g";
+    this.initialize(config, children);
   }
 }
 
 export class Defs extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "defs";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "defs";
+    this.initialize(config, children);
   }
 }
 
 export class LinearGradient extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "linearGradient";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "linearGradient";
+    this.initialize(config, children);
   }
 }
 
 export class RadialGradient extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "radialGradient";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "radialGradient";
+    this.initialize(config, children);
   }
 }
 
 export class Stop extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "stop";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "stop";
+    this.initialize(config, children);
   }
 }
 
 export class Use extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "use";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "use";
+    this.initialize(config, children);
   }
 }
 
 export class Symbol extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "symbol";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "symbol";
+    this.initialize(config, children);
   }
 }
 
 export class ClipPath extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "clipPath";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "clipPath";
+    this.initialize(config, children);
   }
 }
 
 export class Pattern extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "pattern";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "pattern";
+    this.initialize(config, children);
   }
 }
 
 export class Mask extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "mask";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "mask";
+    this.initialize(config, children);
   }
 }
 
 export class Filter extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "filter";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "filter";
+    this.initialize(config, children);
   }
 }
 
 export class FeGaussianBlur extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feGaussianBlur";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feGaussianBlur";
+    this.initialize(config, children);
   }
 }
 
 export class FeOffset extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feOffset";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feOffset";
+    this.initialize(config, children);
   }
 }
 
 export class FeBlend extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feBlend";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feBlend";
+    this.initialize(config, children);
   }
 }
 
 export class FeColorMatrix extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feColorMatrix";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feColorMatrix";
+    this.initialize(config, children);
   }
 }
 
 export class FeComponentTransfer extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feComponentTransfer";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feComponentTransfer";
+    this.initialize(config, children);
   }
 }
 
 export class FeComposite extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feComposite";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feComposite";
+    this.initialize(config, children);
   }
 }
 
 export class FeConvolveMatrix extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feConvolveMatrix";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feConvolveMatrix";
+    this.initialize(config, children);
   }
 }
 
 export class FeDiffuseLighting extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feDiffuseLighting";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feDiffuseLighting";
+    this.initialize(config, children);
   }
 }
 
 export class FeDisplacementMap extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feDisplacementMap";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feDisplacementMap";
+    this.initialize(config, children);
   }
 }
 
 export class FeFlood extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feFlood";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feFlood";
+    this.initialize(config, children);
   }
 }
 
 export class FeImage extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feImage";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feImage";
+    this.initialize(config, children);
   }
 }
 
 export class FeMerge extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feMerge";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feMerge";
+    this.initialize(config, children);
   }
 }
 
 export class FeMorphology extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feMorphology";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feMorphology";
+    this.initialize(config, children);
   }
 }
 
 export class FeSpecularLighting extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feSpecularLighting";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feSpecularLighting";
+    this.initialize(config, children);
   }
 }
 
 export class FeTile extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feTile";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feTile";
+    this.initialize(config, children);
   }
 }
 
 export class FeTurbulence extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "feTurbulence";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "feTurbulence";
+    this.initialize(config, children);
   }
 }
 
 export class Math extends Element {
-  constructor(params) {
-    super(params);
-    this.tagName = "math";
-    this.initialize(params);
+  constructor(config, children) {
+    super(config, children);
+    this.$tagName = "math";
+    this.initialize(config, children);
   }
 }

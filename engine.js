@@ -67,8 +67,8 @@ export default async (app, appProps) => {
   app.get("/materiajs/elements", (req, res) => {
     res.sendFile(path.join(__dirname, "elements.html.js"));
   });
-  app.get("/materiajs/attributes", (req, res) => {
-    res.sendFile(path.join(__dirname, "attributes.js"));
+  app.get("/materiajs/validProps", (req, res) => {
+    res.sendFile(path.join(__dirname, "validProps.js"));
   });
 };
 
@@ -102,7 +102,7 @@ const renderView = async (view, _data, appProps = {}, callback) => {
       }
     } else {
       console.error(
-        `Error in data: Expected an object, but got ${typeof config}.`
+        `Error in data: Expected an object, but got ${typeof config}.`,
       );
     }
   }

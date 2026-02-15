@@ -1,12 +1,10 @@
 // Import all the elements
 import * as elements from "materiajs/elements";
 import {
-  validHTMLAttributes,
+  validAttributes,
   validEvents,
   validMutations,
-  validDOMProperties,
-  validMateriaProps,
-} from "./validProps";
+} from "materiajs/attributes";
 
 // Standard Library Imports
 let document, fs;
@@ -56,8 +54,8 @@ class MateriaJS {
       this.#enableEventDelegation();
       this.#observeViewportClassElements();
 
-      // Add all imports to the unimported list and schedule idle importing
-      this.#initializeUnimportedImports();
+      // Add all pipes to the unimported list and schedule idle pipe importing
+      this.#initializeUnimportedPipes();
     }
   }
 
@@ -687,7 +685,7 @@ class MateriaJS {
 
     if (key === "style") {
       this.#setStyle(element, value);
-    } else if (validHTMLAttributes.includes(key) || key.startsWith("data-")) {
+    } else if (validAttributes.includes(key) || key.startsWith("data-")) {
       this.#setAttribute(element, key, value);
     } else if (key === "innerHTML") {
       this.#setInnerHTML(element, value);
@@ -861,94 +859,94 @@ class MateriaJS {
   importedComponents = {};
 
   /**
-   * Ensures that any imported functions are stringified properly
+   * Ensures that any piped functions are stringified properly
    */
-  #encodeImports(imports) {
-    for (let key in imports) {
-      if (typeof imports[key] === "function") {
-        imports[key] = this.#stringifyFunction(imports[key]);
+  #encodePipe(pipe) {
+    for (let key in pipe) {
+      if (typeof pipe[key] === "function") {
+        pipe[key] = this.#stringifyFunction(pipe[key]);
       } else if (
-        imports.key !== null &&
-        typeof imports[key] === "object" &&
-        imports[key] !== null
+        pipe.key !== null &&
+        typeof pipe[key] === "object" &&
+        pipe[key] !== null
       ) {
-        if (imports[key].path && !imports[key].path.startsWith(IMPORT_PREFIX)) {
-          imports[key].path = `${IMPORT_PREFIX}${imports[key].path}`;
+        if (pipe[key].path && !pipe[key].path.startsWith(IMPORT_PREFIX)) {
+          pipe[key].path = `${IMPORT_PREFIX}${pipe[key].path}`;
         }
       }
     }
-    return imports;
+    return pipe;
   }
 
-  #pendingImports = [];
+  #pendingPipeImports = [];
 
-  // Method to initialize unimported imports
-  #initializeUnimportedImports() {
-    // Iterate through handlers and add imports to the unimported list
+  // Method to initialize unimported pipes
+  #initializeUnimportedPipes() {
+    // Iterate through handlers and add pipes to the unimported list
     for (const binding in this.#handlers) {
       this.#handlers[binding].forEach((handler) => {
-        if (handler.$_imports) {
-          this.addUnimportedImport(handler.$_imports);
+        if (handler.pipe) {
+          this.addUnimportedPipe(handler.pipe);
         }
       });
     }
 
-    // Iterate through delegates and add imports to the unimported list
+    // Iterate through delegates and add pipes to the unimported list
     for (const event in this.#delegate) {
       this.#delegate[event].forEach((delegate) => {
-        if (delegate.$_imports) {
-          this.addUnimportedImport(delegate.$_imports);
+        if (delegate.pipe) {
+          this.addUnimportedPipe(delegate.pipe);
         }
       });
     }
 
-    // Schedule idle import processing
-    this.scheduleIdleImportProcessing();
+    // Schedule idle pipe importing
+    this.scheduleIdlePipeImports();
   }
 
-  // Method to add unimported imports to the list
-  addUnimportedImport(imports) {
-    this.#pendingImports.push(imports);
+  // Method to add unimported pipes to the list
+  addUnimportedPipe(pipe) {
+    this.#pendingPipeImports.push(pipe);
   }
 
-  // Method to schedule idle importing
-  scheduleIdleImportProcessing() {
+  // Method to schedule idle pipe importing
+  scheduleIdlePipeImports() {
     if (typeof requestIdleCallback === "function") {
-      requestIdleCallback(this.processIncompleteImports.bind(this));
+      requestIdleCallback(this.processUnimportedPipes.bind(this));
     } else {
       // Fallback for browsers that do not support requestIdleCallback
-      setTimeout(this.processIncompleteImports.bind(this), 100);
+      setTimeout(this.processUnimportedPipes.bind(this), 100);
     }
   }
 
-  // Method to process unimported imports during idle times
-  processIncompleteImports(deadline) {
-    // Track failed imports to avoid infinite growth
-    const failedImports = new WeakSet();
+  // Method to process unimported pipes during idle times
+  processUnimportedPipes(deadline) {
+    // Track failed pipes to avoid infinite growth
+    const failedPipes = new WeakSet();
 
     while (
-      this.#pendingImports.length > 0 &&
+      this.#pendingPipeImports.length > 0 &&
       (deadline.timeRemaining() > 0 || deadline.didTimeout)
     ) {
-      const imports = this.#pendingImports.shift();
-      this.#resolveIncompleteImports(imports).catch((error) => {
-        console.error("Error with imports:", error);
+      const pipe = this.#pendingPipeImports.shift();
+      this.#resolvePipeImports(pipe).catch((error) => {
+        console.error("Error importing pipe:", error);
         // Only re-add if not already failed before
-        if (typeof imports === "object" && imports !== null) {
-          if (!failedImports.has(imports)) {
-            failedImports.add(imports);
-            this.#pendingImports.push(imports);
+        if (typeof pipe === "object" && pipe !== null) {
+          if (!failedPipes.has(pipe)) {
+            failedPipes.add(pipe);
+            this.#pendingPipeImports.push(pipe);
           } else {
-            // Drop import after one retry to avoid infinite growth
-            console.warn("Dropping import after repeated failure:", imports);
+            // Drop pipe after one retry to avoid infinite growth
+            console.warn("Dropping pipe after repeated failure:", pipe);
           }
         }
       });
     }
 
-    // If there are still unimported imports, schedule the next idle callback
-    if (this.#pendingImports.length > 0) {
-      this.scheduleIdleImportProcessing();
+    // If there are still unimported pipes, schedule the next idle callback
+    if (this.#pendingPipeImports.length > 0) {
+      this.scheduleIdlePipeImports();
     }
   }
 
@@ -972,22 +970,22 @@ class MateriaJS {
     return path.replace(/[^a-zA-Z0-9_\-./@]/g, "");
   }
 
-  async #resolveIncompleteImports(imports) {
-    for (let key in imports) {
-      if (typeof imports[key] === "string") {
-        if (imports[key].startsWith(IMPORT_PREFIX)) {
-          let path = imports[key].replace(IMPORT_PREFIX, "");
+  async #resolvePipeImports(pipe) {
+    for (let key in pipe) {
+      if (typeof pipe[key] === "string") {
+        if (pipe[key].startsWith(IMPORT_PREFIX)) {
+          let path = pipe[key].replace(IMPORT_PREFIX, "");
 
           // Sanitize the path before importing
           path = this.#sanitizePath(path);
           if (!path) {
-            imports[key] = null; // Set to null if the path is invalid
+            pipe[key] = null; // Set to null if the path is invalid
             continue;
           }
 
           // Check if the component is already imported
           if (this.#importCache[path]) {
-            imports[key] =
+            pipe[key] =
               this.#importCache[path][key] || this.#importCache[path].default;
           } else {
             try {
@@ -1001,27 +999,27 @@ class MateriaJS {
               const component = module[key] || module.default;
 
               if (component) {
-                imports[key] = component;
+                pipe[key] = component;
               } else {
                 console.error(`Component ${key} not found in ${path}`);
               }
             } catch (error) {
               console.error(`Error importing ${path}:`, error);
-              imports[key] = null; // Fallback: Set imports[key] to null
+              pipe[key] = null; // Fallback: Set pipe[key] to null
             }
           }
-        } else if (this.#isStringifiedFunction(imports[key])) {
+        } else if (this.#isStringifiedFunction(pipe[key])) {
           try {
-            const func = this.#parseStringifiedFunction(imports[key]);
-            imports[key] = func;
+            const func = this.#parseStringifiedFunction(pipe[key]);
+            pipe[key] = func;
           } catch (error) {
             console.error("Error parsing stringified function:", error);
-            imports[key] = null; // Fallback: Set imports[key] to null
+            pipe[key] = null; // Fallback: Set pipe[key] to null
           }
         }
       }
     }
-    return imports;
+    return pipe;
   }
 
   /**
@@ -1030,7 +1028,7 @@ class MateriaJS {
    * @param {Object} handler - The handler to process.
    */
   async #handle(binding, handler) {
-    let { element, func, property, imports, bindings } = handler;
+    let { element, func, property, pipe, bindings } = handler;
 
     let value;
 
@@ -1041,9 +1039,9 @@ class MateriaJS {
       handler.func = func;
     }
 
-    // check to see if any of the imports values are strings that need to be imported
-    if (imports) {
-      imports = await this.#resolveIncompleteImports(imports);
+    // check to see if any of the pipe values are strings that need to be imported
+    if (pipe) {
+      pipe = await this.#resolvePipeImports(pipe);
     }
 
     // Construct data based on whether this handler uses array bindings
@@ -1059,7 +1057,7 @@ class MateriaJS {
       data = this.get(binding);
     }
 
-    value = func(data, imports, elements);
+    value = func(data, elements, pipe);
 
     // Always resolve element by handlerId
     if (typeof element === "string") {
@@ -1102,7 +1100,7 @@ class MateriaJS {
    * @param {string} event - The event to add the delegate for
    * @param {Function} func - The function to run when the event is triggered
    */
-  #addEventDelegate(element, event, func, imports, preventDefault) {
+  #addEventDelegate(element, event, func, pipe, preventDefault) {
     // first, we need to check what kind of event is being registered
     // -- if it is a load or resize function that are being set to the
     // window, then they need to be handled differently and just get
@@ -1124,7 +1122,7 @@ class MateriaJS {
       target = "document";
     }
 
-    this.#registerEvent(event, target, imports, func, preventDefault);
+    this.#registerEvent(event, target, pipe, func, preventDefault);
   }
 
   #createEventListener(event) {
@@ -1151,7 +1149,7 @@ class MateriaJS {
    * @param {Function} func - The function to run when the event is triggered
    * @param {boolean} preventDefault - Whether to prevent the default behavior of the event
    */
-  #registerEvent(event, target, imports, func, preventDefault) {
+  #registerEvent(event, target, pipe, func, preventDefault) {
     // check to see if the object already has an instance of the event (which, if it does, it means we have already
     // registered an Event Listener for it)
     if (this.#delegate[event] === undefined) {
@@ -1163,15 +1161,15 @@ class MateriaJS {
       }
     }
 
-    // check to see if the imports has any path values that need to be promoted
-    if (imports) {
-      for (let key in imports) {
+    // check to see if the pipe has any path values that need to be promoted
+    if (pipe) {
+      for (let key in pipe) {
         if (
-          imports[key] !== null &&
-          typeof imports[key] === "object" &&
-          imports[key].path
+          pipe[key] !== null &&
+          typeof pipe[key] === "object" &&
+          pipe[key].path
         ) {
-          imports[key] = imports[key].path;
+          pipe[key] = pipe[key].path;
         }
       }
     }
@@ -1179,7 +1177,7 @@ class MateriaJS {
     const eventData = {
       target,
       func,
-      imports,
+      pipe,
       preventDefault,
     };
 
@@ -1191,10 +1189,10 @@ class MateriaJS {
       // Check if element is in the DOM before executing
       if (document.body.contains(target)) {
         // Element is in DOM, execute immediately
-        func(target, imports, elements, { type: "load", target });
+        func(target, pipe, elements, { type: "load", target });
       } else {
         // Element not in DOM yet, defer until it is
-        this.#deferLoadEvent(target, func, imports);
+        this.#deferLoadEvent(target, func, pipe);
       }
     } else {
       this.#delegate[event].push(eventData);
@@ -1206,14 +1204,14 @@ class MateriaJS {
    * Uses MutationObserver to watch for when the element is added
    * @param {Element} target - The target element
    * @param {Function} func - The load handler function
-   * @param {Object} imports - The imports data
+   * @param {Object} pipe - The pipe data
    */
-  #deferLoadEvent(target, func, imports) {
+  #deferLoadEvent(target, func, pipe) {
     // Use MutationObserver to watch for when the element is added to the DOM
     const observer = new MutationObserver((mutations, obs) => {
       if (document.body.contains(target)) {
         // Element is now in the DOM, execute the load handler
-        func(target, imports, elements, { type: "load", target });
+        func(target, pipe, elements, { type: "load", target });
         obs.disconnect(); // Stop observing
       }
     });
@@ -1280,7 +1278,7 @@ class MateriaJS {
       }
 
       for (const eventObj of eventArr) {
-        let { target, func, imports, preventDefault } = eventObj;
+        let { target, func, pipe, preventDefault } = eventObj;
 
         // if the target is a string, then we need to get the element
         // and update the delegate
@@ -1321,9 +1319,8 @@ class MateriaJS {
             if (preventDefault) event.preventDefault();
 
             try {
-              if (imports)
-                imports = await this.#resolveIncompleteImports(imports);
-              func(match, imports, elements, event);
+              if (pipe) pipe = await this.#resolvePipeImports(pipe);
+              func(match, pipe, elements, event);
             } catch (error) {
               console.error("Error executing event handler:", error);
             }
@@ -1342,10 +1339,10 @@ class MateriaJS {
 
     if (loadDelegates !== undefined) {
       loadDelegates.forEach(async (delegate) => {
-        let { target, func, imports } = delegate;
+        let { target, func, pipe } = delegate;
 
-        if (imports) {
-          imports = await this.#resolveIncompleteImports(imports);
+        if (pipe) {
+          pipe = await this.#resolvePipeImports(pipe);
         }
 
         if (typeof target === "string") {
@@ -1358,7 +1355,7 @@ class MateriaJS {
           delegate.func = func;
         }
 
-        func(target, imports, elements);
+        func(target, pipe, elements);
       });
     }
   }
@@ -1475,10 +1472,10 @@ class MateriaJS {
 
     if (funcs !== undefined) {
       funcs.forEach(async (funcObj) => {
-        let { func, target, imports } = funcObj;
+        let { func, target, pipe } = funcObj;
 
-        if (imports) {
-          imports = await this.#resolveIncompleteImports(imports);
+        if (pipe) {
+          pipe = await this.#resolvePipeImports(pipe);
         }
 
         // if the target is a string, then we need to get the element
@@ -1497,7 +1494,7 @@ class MateriaJS {
         // mutation or if the element exists as a child
         // of the mutation
         if (mutationTarget.nodeType === 1 && mutationTarget === target) {
-          func(mutationTarget, imports, mutation);
+          func(mutationTarget, pipe, mutation);
         }
       });
     }
@@ -1594,6 +1591,11 @@ class MateriaJS {
       return null;
     }
 
+    // Check if the template has an "if" property and if it's falsy, return null
+    if (template.hasOwnProperty("if") && !template.if) {
+      return null;
+    }
+
     // If the template is a string, return a text node
     if (typeof template === "string") {
       return document.createTextNode(template);
@@ -1606,89 +1608,60 @@ class MateriaJS {
       tagName,
     );
 
-    // if this is the server, we need to encode the imports
+    // if this is the server, we need to encode the pipe
     if (isServer) {
-      template.$_imports = this.#encodeImports(template.$_imports);
+      template.pipe = this.#encodePipe(template.pipe);
     }
 
-    // Pull out the imports for this element to pass along
-    const imports = isServer
-      ? template.$_imports
-      : this.#encodeImports(template.$_imports);
+    // Pull out the pipe for this element to pass along
+    const pipe = isServer ? template.pipe : this.#encodePipe(template.pipe);
 
-    // Create validProps array for property validation
-    const validProps = [...validHTMLAttributes, ...validDOMProperties];
+    // Pull out the preventDefault value if there is one
+    const preventDefaults = template.preventDefault
+      ? Array.isArray(template.preventDefault)
+        ? template.preventDefault
+        : [template.preventDefault]
+      : [];
 
     // Process each key/value pair in the template
     Object.keys(template).forEach((key) => {
       let value = template[key];
 
-      // Check if this is an event (with or without prefix)
-      let isEvent = false;
-      let preventDefault = false;
-      let eventName = key;
+      if (
+        this.#eventTypes.includes(key) ||
+        key.startsWith("attributes:") ||
+        key.startsWith("keydown:")
+      ) {
+        // check to see if the default should be prevented
+        const preventDefault = preventDefaults.includes(key);
 
-      // Check for __ prefix (events with preventDefault)
-      if (key.startsWith("__")) {
-        eventName = key.slice(2);
-        isEvent =
-          this.#eventTypes.includes(eventName) ||
-          eventName.startsWith("keydown:");
-        preventDefault = true;
-      }
-      // Check for _ prefix (events without preventDefault and mutations)
-      else if (key.startsWith("_")) {
-        eventName = key.slice(1);
-        isEvent =
-          this.#eventTypes.includes(eventName) ||
-          eventName.startsWith("keydown:") ||
-          eventName.startsWith("attributes:");
-        preventDefault = false;
-      }
-
-      if (isEvent) {
         // create a delegateId if the element doesn't already have one
         if (!element.dataset.delegateId) {
           element.dataset.delegateId = this.#generateUniqueId();
         }
 
-        this.#addEventDelegate(element, key, value, imports, preventDefault);
+        this.#addEventDelegate(element, key, value, pipe, preventDefault);
       } else {
-        // Skip framework-internal keys that are already processed
-        if (validMateriaProps.includes(key)) {
-          return;
-        }
-
-        // Check if the key is a valid property
-        const isValid = validProps.includes(key) || key.startsWith("data");
-
-        if (!isValid) {
-          console.warn(
-            `Invalid property "${key}" on <${tagName}> element. This property is not a valid HTML attribute, DOM property, or framework property.`,
-          );
-          return;
-        }
-
         if (this.#isStringifiedFunction(value)) {
           value = this.#parseStringifiedFunction(value);
         }
 
         // If the value is a function and the key isn't an event, it's a binding
         if (typeof value === "function" && !this.#eventTypes.includes(key)) {
-          let binding = template.$_bind;
-          let triggers = template.$_triggers || [];
+          let binding = template.binding;
+          let triggers = template.triggers || [];
 
           // if the binding is undefined, we need to alert the user and continue the render
           if (!binding) {
-            console.error(
-              `No binding found for function value: ${value.toString()}`,
-            );
+            // console.error(
+            //   `No binding found for function value: ${value.toString()}`
+            // );
           } else {
             this.#processFunctionValue(
               element,
               key,
               value,
-              { ...imports },
+              { ...pipe },
               binding,
               triggers,
               depth,
@@ -1818,7 +1791,7 @@ class MateriaJS {
     element,
     property,
     func,
-    imports,
+    pipe,
     binding,
     triggers,
     depth,
@@ -1826,12 +1799,12 @@ class MateriaJS {
     let handlerElementId,
       preservedFunc = func;
 
-    let clientImports = {};
+    let clientPipe = {};
 
-    // loop through the keys of the imports and set the value to the data attribute
-    if (imports) {
-      for (const key in imports) {
-        const value = imports[key];
+    // loop through the keys of the pipe and set the value to the data attribute
+    if (pipe) {
+      for (const key in pipe) {
+        const value = pipe[key];
 
         if (
           value &&
@@ -1840,10 +1813,10 @@ class MateriaJS {
           value?.data &&
           value?.path
         ) {
-          // assign the data to the clientImports
-          clientImports[key] = value.data;
+          // assign the data to the clientPipe
+          clientPipe[key] = value.data;
         } else {
-          clientImports[key] = value;
+          clientPipe[key] = value;
         }
       }
     }
@@ -1856,7 +1829,7 @@ class MateriaJS {
       } else {
         handlerElementId = element.dataset.handlerId;
       }
-      imports = clientImports;
+      pipe = clientPipe;
     } else {
       if (!element.dataset.handlerId) {
         handlerElementId = this.#generateUniqueId();
@@ -1865,18 +1838,18 @@ class MateriaJS {
         handlerElementId = element.dataset.handlerId;
       }
       func = func.toString();
-      if (imports) {
-        for (const key in imports) {
-          const value = imports[key];
+      if (pipe) {
+        for (const key in pipe) {
+          const value = pipe[key];
           if (
             value &&
             typeof value === "object" &&
             value?.data &&
             value?.path
           ) {
-            imports[key] = value.path;
+            pipe[key] = value.path;
           } else {
-            imports[key] = value;
+            pipe[key] = value;
           }
         }
       }
@@ -1895,7 +1868,7 @@ class MateriaJS {
         element: handlerElementId,
         func,
         property,
-        imports,
+        pipe,
         bindings: bindingsArray, // Store all bindings this handler depends on
       });
     });
@@ -1941,7 +1914,7 @@ class MateriaJS {
       data = this.get(binding);
     }
 
-    const result = preservedFunc(data, elements, clientImports);
+    const result = preservedFunc(data, elements, clientPipe);
 
     if (result !== null) {
       this.#setElementAttribute(element, property, result, depth);

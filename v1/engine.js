@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Modules
-import MateriaJS from "materiajs";
+import MateriaJS from "../materia";
 
 /**
  * Handles a function value in the data.
@@ -102,7 +102,7 @@ const renderView = async (view, _data, appProps = {}, callback) => {
       }
     } else {
       console.error(
-        `Error in data: Expected an object, but got ${typeof config}.`
+        `Error in data: Expected an object, but got ${typeof config}.`,
       );
     }
   }

@@ -441,66 +441,85 @@ export const validHTMLAttributes = [
   "zoomAndPan",
 ];
 
-export const validDOMProperties = [
-  // Basic element propertiies (string)
-  "$tagName", // string - element tag name for creating new elements
-
-  // Content properties (string)
-  "$textContent", // string - sets text content (escapes HTML)
-  "$innerHTML", // string - sets HTML content (parses HTML)
-  "$innerText", // string - sets text content (respects CSS)
-
-  // Form propertiesxw
-  "$value", // string - current value (for inputs, textareas, select)
-  "$checked", // boolean - checked state (checkboxes, radio buttons)
-  "$indeterminate", // boolean - indeterminate state (checkboxes)
-  "$selected", // boolean - selected state (option elements)
-  "$defaultValue", // string - default value attribute
-  "$defaultChecked", // boolean - default checked attribute
-  "$selectedIndex", // number - selected index for select elements
-  "$selectionStart", // number - cursor start position (text inputs)
-  "$selectionEnd", // number - cursor end position (text inputs)
-  "$selectionDirection", // string - "forward" | "backward" | "none"
-
-  // Style properties
-  "$className", // string - class attribute as string
-  "$style", // object - key/value pairs for style properties (camelCase keys)
-  "$classList", // array<string> | object<string, boolean> - classes to add
-  "$dataset", // object<string, string> - data-* attributes as key/value pairs
-
-  // Scroll properties
-  "$scrollTop", // number - vertical scroll position in pixels
-  "$scrollLeft", // number - horizontal scroll position in pixels
-
-  // Boolean/State properties
-  "$disabled", // boolean - disabled state (form elements, buttons)
-  "$readOnly", // boolean - read-only state (inputs, textareas)
-  "$hidden", // boolean - hidden state
-  "$contentEditable", // string | boolean - "true" | "false" | "inherit" or boolean
-  "$spellcheck", // boolean - enables/disables spellcheck
-  "$draggable", // boolean - draggable state
-
-  // Element properties
-  "$dir", // string - text direction: "ltr" | "rtl" | "auto"
-  "$lang", // string - language code (e.g., "en", "es")
-  "$title", // string - tooltip text
-  "$tabIndex", // number - tab order (-1 to remove from tab order)
-  "$accessKey", // string - keyboard shortcut key
-
-  // Media properties (audio/video)
-  "$currentTime", // number - playback position in seconds
-  "$volume", // number - volume level (0.0 to 1.0)
-  "$playbackRate", // number - playback speed (1.0 = normal, 2.0 = double)
-  "$muted", // boolean - muted state
-  "$controls", // boolean - show/hide media controls
-  "$autoplay", // boolean - autoplay state
-  "$loop", // boolean - loop playback state
-  "$preload", // string - "none" | "metadata" | "auto"
-
-  // Canvas properties
-  "$width", // number - canvas width in pixels
-  "$height", // number - canvas height in pixels
+// DOM Properties organized by type for easier handling
+const stringDOMProperties = [
+  "$tagName", // element tag name
+  "$textContent", // text content (escapes HTML)
+  "$innerHTML", // HTML content (parses HTML)
+  "$innerText", // text content (respects CSS)
+  "$value", // current value (inputs, textareas, select)
+  "$defaultValue", // default value attribute
+  "$selectionDirection", // "forward" | "backward" | "none"
+  "$className", // class attribute as string
+  "$dir", // text direction: "ltr" | "rtl" | "auto"
+  "$lang", // language code
+  "$title", // tooltip text
+  "$accessKey", // keyboard shortcut key
+  "$preload", // "none" | "metadata" | "auto"
 ];
+
+const booleanDOMProperties = [
+  "$checked", // checked state (checkboxes, radio)
+  "$indeterminate", // indeterminate state (checkboxes)
+  "$selected", // selected state (option elements)
+  "$defaultChecked", // default checked attribute
+  "$disabled", // disabled state
+  "$readOnly", // read-only state
+  "$hidden", // hidden state
+  "$spellcheck", // spellcheck enabled/disabled
+  "$draggable", // draggable state
+  "$muted", // muted state (media)
+  "$controls", // show/hide media controls
+  "$autoplay", // autoplay state (media)
+  "$loop", // loop playback state (media)
+];
+
+const numberDOMProperties = [
+  "$selectedIndex", // selected index for select elements
+  "$selectionStart", // cursor start position
+  "$selectionEnd", // cursor end position
+  "$scrollTop", // vertical scroll position in pixels
+  "$scrollLeft", // horizontal scroll position in pixels
+  "$tabIndex", // tab order
+  "$currentTime", // playback position in seconds (media)
+  "$volume", // volume level 0.0 to 1.0 (media)
+  "$playbackRate", // playback speed (media)
+  "$width", // canvas width in pixels
+  "$height", // canvas height in pixels
+];
+
+const objectDOMProperties = [
+  "$style", // object - key/value pairs for style properties
+  "$dataset", // object - data-* attributes as key/value pairs
+];
+
+const arrayDOMProperties = [
+  "$classList", // array<string> - classes to add
+];
+
+// Special case: contentEditable can be string or boolean
+const specialDOMProperties = [
+  "$contentEditable", // string | boolean - "true" | "false" | "inherit" or boolean
+];
+
+export const validDOMProperties = [
+  ...stringDOMProperties,
+  ...booleanDOMProperties,
+  ...numberDOMProperties,
+  ...objectDOMProperties,
+  ...arrayDOMProperties,
+  ...specialDOMProperties,
+];
+
+// Export sub-arrays for type-specific handling
+export {
+  stringDOMProperties,
+  booleanDOMProperties,
+  numberDOMProperties,
+  objectDOMProperties,
+  arrayDOMProperties,
+  specialDOMProperties,
+};
 
 export const validEvents = [
   "click",

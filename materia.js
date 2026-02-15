@@ -1,10 +1,18 @@
 // Import all the elements
 import * as elements from "materiajs/elements";
+
 import {
-  validAttributes,
+  validHTMLAttributes,
   validEvents,
   validMutations,
-} from "materiajs/attributes";
+  validDOMProperties,
+  validMateriaProps,
+  stringDOMProperties,
+  booleanDOMProperties,
+  numberDOMProperties,
+  objectDOMProperties,
+  arrayDOMProperties,
+} from "materiajs/validProps";
 
 // Standard Library Imports
 let document, fs;
@@ -54,8 +62,8 @@ class MateriaJS {
       this.#enableEventDelegation();
       this.#observeViewportClassElements();
 
-      // Add all pipes to the unimported list and schedule idle pipe importing
-      this.#initializeUnimportedPipes();
+      // Add all imports to the unimported list and schedule idle importing
+      this.#initializeUnimportedImports();
     }
   }
 
@@ -164,7 +172,7 @@ class MateriaJS {
             target[key] = {};
           } else if (typeof target[key] !== "object") {
             console.error(
-              `Error: Cannot set property on non-object value at ${key}`
+              `Error: Cannot set property on non-object value at ${key}`,
             );
             return false;
           }
@@ -227,7 +235,7 @@ class MateriaJS {
           `This binding has been updated ${
             this.#circuitBreaker.maxUpdates
           }+ times in ${this.#circuitBreaker.timeWindow}ms. ` +
-          `Blocking further updates to prevent infinite loop.`
+          `Blocking further updates to prevent infinite loop.`,
       );
       return;
     }
@@ -571,7 +579,7 @@ class MateriaJS {
       return removedElement[0];
     } else {
       console.warn(
-        `Warning: No matching element found in ${binding} for removal.`
+        `Warning: No matching element found in ${binding} for removal.`,
       );
     }
 
@@ -662,41 +670,80 @@ class MateriaJS {
   }
 
   /**
-   * Converts a camelCase string to a hyphenated string.
-   * @param {string} str - The camelCase string to convert.
-   * @returns {string} The hyphenated string.
-   */
-  #camelToHyphen(str) {
-    return str.replace(/[A-Z]/g, (match) => "-" + match.toLowerCase());
-  }
-
-  /**
-   * Sets an attribute on an element.
-   * @param {Element} element - The element to set the attribute on.
-   * @param {string} key - The key of the attribute.
-   * @param {string} value - The value of the attribute.
-   * @param {string} bindingId - The ID of the binding.
+   * Sets an attribute or DOM property on an element.
+   * @param {Element} element - The element to set the attribute/property on.
+   * @param {string} key - The key of the attribute/property.
+   * @param {*} value - The value to set.
    * @param {number} depth - The depth of the rendering.
    * @returns {void}
    */
-  #setElementAttribute(element, key, value, depth = 0) {
+  #setElementAttributesAndProperties(element, key, value, depth = 0) {
     // there is no element in the DOM to set this value to
     if (!element) return;
 
-    if (key === "style") {
-      this.#setStyle(element, value);
-    } else if (validAttributes.includes(key) || key.startsWith("data-")) {
-      this.#setAttribute(element, key, value);
-    } else if (key === "innerHTML") {
-      this.#setInnerHTML(element, value);
-    } else if (key === "prepend") {
-      this.#prependChild(element, value, depth);
+    // Handle DOM properties ($ prefix)
+    if (key.startsWith("$")) {
+      const propName = key.slice(1); // Remove $ prefix
+
+      // String properties - direct assignment
+      if (stringDOMProperties.includes(key)) {
+        element[propName] = value;
+      }
+      // Boolean properties - direct assignment
+      else if (booleanDOMProperties.includes(key)) {
+        element[propName] = Boolean(value);
+      }
+      // Number properties - convert to number
+      else if (numberDOMProperties.includes(key)) {
+        element[propName] = Number(value);
+      }
+      // Object properties
+      else if (objectDOMProperties.includes(key)) {
+        if (key === "$style") {
+          // Handle style object
+          if (typeof value === "object") {
+            Object.assign(element.style, value);
+          }
+        } else if (key === "$dataset") {
+          // Handle dataset object
+          if (typeof value === "object") {
+            Object.assign(element.dataset, value);
+          }
+        }
+      }
+      // Array properties
+      else if (arrayDOMProperties.includes(key)) {
+        if (key === "$classList" && Array.isArray(value)) {
+          element.classList.add(...value);
+        }
+      }
+      // Special case: contentEditable (can be string or boolean)
+      else if (key === "$contentEditable") {
+        element.contentEditable = value;
+      }
+      return;
+    }
+
+    // Handle HTML attributes and special rendering properties
+    let attributeKey = key;
+    let isDataAttribute = key.startsWith("data-") || /^data[A-Z]/.test(key);
+
+    // Convert camelCase data attributes to kebab-case for HTML attributes
+    // dataTheme -> data-theme, dataUserName -> data-user-name
+    if (isDataAttribute && !key.startsWith("data-")) {
+      const afterData = key.slice(4); // Remove "data" prefix
+      const converted =
+        afterData[0].toLowerCase() +
+        afterData
+          .slice(1)
+          .replace(/[A-Z]/g, (match) => "-" + match.toLowerCase()); // Convert camelCase to kebab-case
+      attributeKey = "data-" + converted;
+    }
+
+    if (validHTMLAttributes.includes(key) || isDataAttribute) {
+      this.#setAttribute(element, attributeKey, value);
     } else if (key === "children" || key === "child") {
       this.#setChildren(element, key, value, depth);
-    } else if (key === "textContent") {
-      this.#setTextContent(element, value);
-    } else if (key === "append") {
-      this.#appendChild(element, value, depth);
     }
   }
 
@@ -730,53 +777,6 @@ class MateriaJS {
   }
 
   /**
-   * Sets the style of an element.
-   * @param {Element} element - The element to set the style on.
-   * @param {string|Object} value - The style to set.
-   * @returns {void}
-   */
-  #setStyle(element, value) {
-    let style = "";
-    if (typeof value === "string") {
-      style = value;
-    } else if (typeof value === "object") {
-      for (let key in value) {
-        const property = key.includes("-") ? key : this.#camelToHyphen(key);
-        style += `${property}:${value[key]};`;
-      }
-    }
-    element.setAttribute("style", style);
-  }
-
-  /**
-   * Sets the innerHTML of an element.
-   * @param {Element} element - The element to set the inner HTML on.
-   * @param {string} value - The inner HTML to set.
-   * @returns {void}
-   */
-  #setInnerHTML(element, value) {
-    element.innerHTML = value;
-  }
-
-  /**
-   * Prepends a child to an element.
-   * @param {Element} element - The element to prepend the child to.
-   * @param {string|Object} value - The value to prepend.
-   * @param {number} depth - The depth of the rendering.
-   * @returns {void}
-   */
-  #prependChild(element, value, depth) {
-    if (typeof value !== "object") {
-      element.prepend(document.createTextNode(value));
-    } else {
-      const childElement = this.render(value, null, depth + 1);
-      if (childElement !== null) {
-        element.prepend(childElement);
-      }
-    }
-  }
-
-  /**
    * Sets the children of an element.
    * @param {Element} element - The element to set the children on.
    * @param {string} key - The key of the children.
@@ -794,7 +794,7 @@ class MateriaJS {
     // check to see if the children value is valid
     if (!Array.isArray(children)) {
       console.error(
-        `Invalid children value for key: ${key}, expected an array, got: ${value}`
+        `Invalid children value for key: ${key}, expected an array, got: ${value}`,
       );
       console.error(`Element Info:
         tagName: ${element.tagName}
@@ -824,129 +824,100 @@ class MateriaJS {
   }
 
   /**
-   * Sets the text content of an element.
-   * @param {Element} element - The element to set the text content on.
-   * @param {string} value - The value of the text content.
-   * @returns {void}
-   */
-  #setTextContent(element, value) {
-    element.textContent = "";
-    element.appendChild(document.createTextNode(value));
-  }
-
-  /**
-   * Appends a child
-   * @param {Element} element - The element to append the child to.
-   * @param {string|Object} value - The value to append.
-   * @param {number} depth - The depth of the rendering.
-   * @returns {void}
-   */
-  #appendChild(element, value, depth) {
-    if (typeof value !== "object") {
-      element.appendChild(document.createTextNode(value));
-    } else {
-      const childElement = this.render(value, null, depth + 1);
-      if (childElement !== null) {
-        element.appendChild(childElement);
-      }
-    }
-  }
-
-  /**
    * Stores imported components so they aren't imported multiple times
    * @type {Object}
    */
   importedComponents = {};
 
   /**
-   * Ensures that any piped functions are stringified properly
+   * Ensures that any imported functions are stringified properly
    */
-  #encodePipe(pipe) {
-    for (let key in pipe) {
-      if (typeof pipe[key] === "function") {
-        pipe[key] = this.#stringifyFunction(pipe[key]);
+  #encodeImports(imports) {
+    for (let key in imports) {
+      if (typeof imports[key] === "function") {
+        imports[key] = this.#stringifyFunction(imports[key]);
       } else if (
-        pipe.key !== null &&
-        typeof pipe[key] === "object" &&
-        pipe[key] !== null
+        imports.key !== null &&
+        typeof imports[key] === "object" &&
+        imports[key] !== null
       ) {
-        if (pipe[key].path && !pipe[key].path.startsWith(IMPORT_PREFIX)) {
-          pipe[key].path = `${IMPORT_PREFIX}${pipe[key].path}`;
+        if (imports[key].path && !imports[key].path.startsWith(IMPORT_PREFIX)) {
+          imports[key].path = `${IMPORT_PREFIX}${imports[key].path}`;
         }
       }
     }
-    return pipe;
+    return imports;
   }
 
-  #pendingPipeImports = [];
+  #pendingImports = [];
 
-  // Method to initialize unimported pipes
-  #initializeUnimportedPipes() {
-    // Iterate through handlers and add pipes to the unimported list
+  // Method to initialize unimported imports
+  #initializeUnimportedImports() {
+    // Iterate through handlers and add imports to the unimported list
     for (const binding in this.#handlers) {
       this.#handlers[binding].forEach((handler) => {
-        if (handler.pipe) {
-          this.addUnimportedPipe(handler.pipe);
+        if (handler.$_imports) {
+          this.addUnimportedImport(handler.$_imports);
         }
       });
     }
 
-    // Iterate through delegates and add pipes to the unimported list
+    // Iterate through delegates and add imports to the unimported list
     for (const event in this.#delegate) {
       this.#delegate[event].forEach((delegate) => {
-        if (delegate.pipe) {
-          this.addUnimportedPipe(delegate.pipe);
+        if (delegate.$_imports) {
+          this.addUnimportedImport(delegate.$_imports);
         }
       });
     }
 
-    // Schedule idle pipe importing
-    this.scheduleIdlePipeImports();
+    // Schedule idle import processing
+    this.scheduleIdleImportProcessing();
   }
 
-  // Method to add unimported pipes to the list
-  addUnimportedPipe(pipe) {
-    this.#pendingPipeImports.push(pipe);
+  // Method to add unimported imports to the list
+  addUnimportedImport(imports) {
+    this.#pendingImports.push(imports);
   }
 
-  // Method to schedule idle pipe importing
-  scheduleIdlePipeImports() {
+  // Method to schedule idle importing
+  scheduleIdleImportProcessing() {
     if (typeof requestIdleCallback === "function") {
-      requestIdleCallback(this.processUnimportedPipes.bind(this));
+      requestIdleCallback(this.processIncompleteImports.bind(this));
     } else {
       // Fallback for browsers that do not support requestIdleCallback
-      setTimeout(this.processUnimportedPipes.bind(this), 100);
+      setTimeout(this.processIncompleteImports.bind(this), 100);
     }
   }
 
-  // Method to process unimported pipes during idle times
-  processUnimportedPipes(deadline) {
-    // Track failed pipes to avoid infinite growth
-    const failedPipes = new WeakSet();
+  // Method to process unimported imports during idle times
+  processIncompleteImports(deadline) {
+    // Track failed imports to avoid infinite growth
+    const failedImports = new WeakSet();
 
     while (
-      this.#pendingPipeImports.length > 0 &&
+      this.#pendingImports.length > 0 &&
       (deadline.timeRemaining() > 0 || deadline.didTimeout)
     ) {
-      const pipe = this.#pendingPipeImports.shift();
-      this.#resolvePipeImports(pipe).catch((error) => {
-        console.error("Error importing pipe:", error);
+      const imports = this.#pendingImports.shift();
+      this.#resolveIncompleteImports(imports).catch((error) => {
+        console.error("Error with imports:", error);
         // Only re-add if not already failed before
-        if (typeof pipe === "object" && pipe !== null) {
-          if (!failedPipes.has(pipe)) {
-            failedPipes.add(pipe);
-            this.#pendingPipeImports.push(pipe);
+        if (typeof imports === "object" && imports !== null) {
+          if (!failedImports.has(imports)) {
+            failedImports.add(imports);
+            this.#pendingImports.push(imports);
           } else {
-            // Drop pipe after one retry to avoid infinite growth
-            console.warn("Dropping pipe after repeated failure:", pipe);
+            // Drop import after one retry to avoid infinite growth
+            console.warn("Dropping import after repeated failure:", imports);
           }
         }
       });
     }
 
-    // If there are still unimported pipes, schedule the next idle callback
-    if (this.#pendingPipeImports.length > 0) {
-      this.scheduleIdlePipeImports();
+    // If there are still unimported imports, schedule the next idle callback
+    if (this.#pendingImports.length > 0) {
+      this.scheduleIdleImportProcessing();
     }
   }
 
@@ -970,22 +941,22 @@ class MateriaJS {
     return path.replace(/[^a-zA-Z0-9_\-./@]/g, "");
   }
 
-  async #resolvePipeImports(pipe) {
-    for (let key in pipe) {
-      if (typeof pipe[key] === "string") {
-        if (pipe[key].startsWith(IMPORT_PREFIX)) {
-          let path = pipe[key].replace(IMPORT_PREFIX, "");
+  async #resolveIncompleteImports(imports) {
+    for (let key in imports) {
+      if (typeof imports[key] === "string") {
+        if (imports[key].startsWith(IMPORT_PREFIX)) {
+          let path = imports[key].replace(IMPORT_PREFIX, "");
 
           // Sanitize the path before importing
           path = this.#sanitizePath(path);
           if (!path) {
-            pipe[key] = null; // Set to null if the path is invalid
+            imports[key] = null; // Set to null if the path is invalid
             continue;
           }
 
           // Check if the component is already imported
           if (this.#importCache[path]) {
-            pipe[key] =
+            imports[key] =
               this.#importCache[path][key] || this.#importCache[path].default;
           } else {
             try {
@@ -999,27 +970,27 @@ class MateriaJS {
               const component = module[key] || module.default;
 
               if (component) {
-                pipe[key] = component;
+                imports[key] = component;
               } else {
                 console.error(`Component ${key} not found in ${path}`);
               }
             } catch (error) {
               console.error(`Error importing ${path}:`, error);
-              pipe[key] = null; // Fallback: Set pipe[key] to null
+              imports[key] = null; // Fallback: Set imports[key] to null
             }
           }
-        } else if (this.#isStringifiedFunction(pipe[key])) {
+        } else if (this.#isStringifiedFunction(imports[key])) {
           try {
-            const func = this.#parseStringifiedFunction(pipe[key]);
-            pipe[key] = func;
+            const func = this.#parseStringifiedFunction(imports[key]);
+            imports[key] = func;
           } catch (error) {
             console.error("Error parsing stringified function:", error);
-            pipe[key] = null; // Fallback: Set pipe[key] to null
+            imports[key] = null; // Fallback: Set imports[key] to null
           }
         }
       }
     }
-    return pipe;
+    return imports;
   }
 
   /**
@@ -1028,7 +999,7 @@ class MateriaJS {
    * @param {Object} handler - The handler to process.
    */
   async #handle(binding, handler) {
-    let { element, func, property, pipe, bindings } = handler;
+    let { element, func, property, imports, bindings } = handler;
 
     let value;
 
@@ -1039,9 +1010,9 @@ class MateriaJS {
       handler.func = func;
     }
 
-    // check to see if any of the pipe values are strings that need to be imported
-    if (pipe) {
-      pipe = await this.#resolvePipeImports(pipe);
+    // check to see if any of the imports values are strings that need to be imported
+    if (imports) {
+      imports = await this.#resolveIncompleteImports(imports);
     }
 
     // Construct data based on whether this handler uses array bindings
@@ -1057,7 +1028,7 @@ class MateriaJS {
       data = this.get(binding);
     }
 
-    value = func(data, elements, pipe);
+    value = func(data, imports, elements);
 
     // Always resolve element by handlerId
     if (typeof element === "string") {
@@ -1081,7 +1052,7 @@ class MateriaJS {
       }
     }
 
-    this.#setElementAttribute(element, property, value);
+    this.#setElementAttributesAndProperties(element, property, value);
   }
 
   /**
@@ -1100,7 +1071,7 @@ class MateriaJS {
    * @param {string} event - The event to add the delegate for
    * @param {Function} func - The function to run when the event is triggered
    */
-  #addEventDelegate(element, event, func, pipe, preventDefault) {
+  #addEventDelegate(element, event, func, imports, preventDefault) {
     // first, we need to check what kind of event is being registered
     // -- if it is a load or resize function that are being set to the
     // window, then they need to be handled differently and just get
@@ -1122,7 +1093,7 @@ class MateriaJS {
       target = "document";
     }
 
-    this.#registerEvent(event, target, pipe, func, preventDefault);
+    this.#registerEvent(event, target, imports, func, preventDefault);
   }
 
   #createEventListener(event) {
@@ -1149,7 +1120,7 @@ class MateriaJS {
    * @param {Function} func - The function to run when the event is triggered
    * @param {boolean} preventDefault - Whether to prevent the default behavior of the event
    */
-  #registerEvent(event, target, pipe, func, preventDefault) {
+  #registerEvent(event, target, imports, func, preventDefault) {
     // check to see if the object already has an instance of the event (which, if it does, it means we have already
     // registered an Event Listener for it)
     if (this.#delegate[event] === undefined) {
@@ -1161,15 +1132,15 @@ class MateriaJS {
       }
     }
 
-    // check to see if the pipe has any path values that need to be promoted
-    if (pipe) {
-      for (let key in pipe) {
+    // check to see if the imports has any path values that need to be promoted
+    if (imports) {
+      for (let key in imports) {
         if (
-          pipe[key] !== null &&
-          typeof pipe[key] === "object" &&
-          pipe[key].path
+          imports[key] !== null &&
+          typeof imports[key] === "object" &&
+          imports[key].path
         ) {
-          pipe[key] = pipe[key].path;
+          imports[key] = imports[key].path;
         }
       }
     }
@@ -1177,7 +1148,7 @@ class MateriaJS {
     const eventData = {
       target,
       func,
-      pipe,
+      imports,
       preventDefault,
     };
 
@@ -1189,10 +1160,10 @@ class MateriaJS {
       // Check if element is in the DOM before executing
       if (document.body.contains(target)) {
         // Element is in DOM, execute immediately
-        func(target, pipe, elements, { type: "load", target });
+        func(target, imports, elements, { type: "load", target });
       } else {
         // Element not in DOM yet, defer until it is
-        this.#deferLoadEvent(target, func, pipe);
+        this.#deferLoadEvent(target, func, imports);
       }
     } else {
       this.#delegate[event].push(eventData);
@@ -1204,14 +1175,14 @@ class MateriaJS {
    * Uses MutationObserver to watch for when the element is added
    * @param {Element} target - The target element
    * @param {Function} func - The load handler function
-   * @param {Object} pipe - The pipe data
+   * @param {Object} imports - The imports data
    */
-  #deferLoadEvent(target, func, pipe) {
+  #deferLoadEvent(target, func, imports) {
     // Use MutationObserver to watch for when the element is added to the DOM
     const observer = new MutationObserver((mutations, obs) => {
       if (document.body.contains(target)) {
         // Element is now in the DOM, execute the load handler
-        func(target, pipe, elements, { type: "load", target });
+        func(target, imports, elements, { type: "load", target });
         obs.disconnect(); // Stop observing
       }
     });
@@ -1228,7 +1199,7 @@ class MateriaJS {
         observer.disconnect();
         console.warn(
           "Load event deferred for more than 5 seconds, giving up:",
-          target
+          target,
         );
       }
     }, 5000);
@@ -1278,7 +1249,7 @@ class MateriaJS {
       }
 
       for (const eventObj of eventArr) {
-        let { target, func, pipe, preventDefault } = eventObj;
+        let { target, func, imports, preventDefault } = eventObj;
 
         // if the target is a string, then we need to get the element
         // and update the delegate
@@ -1287,7 +1258,7 @@ class MateriaJS {
             target = document;
           } else {
             target = document.querySelector(
-              "[data-delegate-id=" + target + "]"
+              "[data-delegate-id=" + target + "]",
             );
           }
 
@@ -1319,8 +1290,9 @@ class MateriaJS {
             if (preventDefault) event.preventDefault();
 
             try {
-              if (pipe) pipe = await this.#resolvePipeImports(pipe);
-              func(match, pipe, elements, event);
+              if (imports)
+                imports = await this.#resolveIncompleteImports(imports);
+              func(match, imports, elements, event);
             } catch (error) {
               console.error("Error executing event handler:", error);
             }
@@ -1339,10 +1311,10 @@ class MateriaJS {
 
     if (loadDelegates !== undefined) {
       loadDelegates.forEach(async (delegate) => {
-        let { target, func, pipe } = delegate;
+        let { target, func, imports } = delegate;
 
-        if (pipe) {
-          pipe = await this.#resolvePipeImports(pipe);
+        if (imports) {
+          imports = await this.#resolveIncompleteImports(imports);
         }
 
         if (typeof target === "string") {
@@ -1355,7 +1327,7 @@ class MateriaJS {
           delegate.func = func;
         }
 
-        func(target, pipe, elements);
+        func(target, imports, elements);
       });
     }
   }
@@ -1472,10 +1444,10 @@ class MateriaJS {
 
     if (funcs !== undefined) {
       funcs.forEach(async (funcObj) => {
-        let { func, target, pipe } = funcObj;
+        let { func, target, imports } = funcObj;
 
-        if (pipe) {
-          pipe = await this.#resolvePipeImports(pipe);
+        if (imports) {
+          imports = await this.#resolveIncompleteImports(imports);
         }
 
         // if the target is a string, then we need to get the element
@@ -1494,7 +1466,7 @@ class MateriaJS {
         // mutation or if the element exists as a child
         // of the mutation
         if (mutationTarget.nodeType === 1 && mutationTarget === target) {
-          func(mutationTarget, pipe, mutation);
+          func(mutationTarget, imports, mutation);
         }
       });
     }
@@ -1554,7 +1526,7 @@ class MateriaJS {
   #observeViewportClassElements() {
     // on page load, get all the elements that have a data-vclass property
     const vclassElements = document.querySelectorAll(
-      `[${DATA_VCLASS}]:not([${DATA_VCLASS_OBSERVED}=true])`
+      `[${DATA_VCLASS}]:not([${DATA_VCLASS_OBSERVED}=true])`,
     );
 
     // and then observe each one
@@ -1591,84 +1563,111 @@ class MateriaJS {
       return null;
     }
 
-    // Check if the template has an "if" property and if it's falsy, return null
-    if (template.hasOwnProperty("if") && !template.if) {
-      return null;
-    }
-
     // If the template is a string, return a text node
     if (typeof template === "string") {
       return document.createTextNode(template);
     }
 
     // Create the element
-    const tagName = template.tagName || "div";
+    const tagName = template.$tagName || "div";
     const element = document.createElementNS(
       this.#getNamespace(tagName),
-      tagName
+      tagName,
     );
 
-    // if this is the server, we need to encode the pipe
+    // if this is the server, we need to encode the imports
     if (isServer) {
-      template.pipe = this.#encodePipe(template.pipe);
+      template.$_imports = this.#encodeImports(template.$_imports);
     }
 
-    // Pull out the pipe for this element to pass along
-    const pipe = isServer ? template.pipe : this.#encodePipe(template.pipe);
+    // Pull out the imports for this element to pass along
+    const imports = isServer
+      ? template.$_imports
+      : this.#encodeImports(template.$_imports);
 
-    // Pull out the preventDefault value if there is one
-    const preventDefaults = template.preventDefault
-      ? Array.isArray(template.preventDefault)
-        ? template.preventDefault
-        : [template.preventDefault]
-      : [];
+    // Create validProps array for property validation
+    const validProps = [...validHTMLAttributes, ...validDOMProperties];
 
     // Process each key/value pair in the template
     Object.keys(template).forEach((key) => {
       let value = template[key];
 
-      if (
-        this.#eventTypes.includes(key) ||
-        key.startsWith("attributes:") ||
-        key.startsWith("keydown:")
-      ) {
-        // check to see if the default should be prevented
-        const preventDefault = preventDefaults.includes(key);
+      // Check if this is an event (with or without prefix)
+      let isEvent = false;
+      let preventDefault = false;
+      let eventName = key;
 
+      // Check for __ prefix (events with preventDefault)
+      if (key.startsWith("__")) {
+        eventName = key.slice(2);
+        isEvent =
+          this.#eventTypes.includes(eventName) ||
+          eventName.startsWith("keydown:");
+        preventDefault = true;
+      }
+      // Check for _ prefix (events without preventDefault and mutations)
+      else if (key.startsWith("_")) {
+        eventName = key.slice(1);
+        isEvent =
+          this.#eventTypes.includes(eventName) ||
+          eventName.startsWith("keydown:") ||
+          eventName.startsWith("attributes:");
+        preventDefault = false;
+      }
+
+      if (isEvent) {
         // create a delegateId if the element doesn't already have one
         if (!element.dataset.delegateId) {
           element.dataset.delegateId = this.#generateUniqueId();
         }
 
-        this.#addEventDelegate(element, key, value, pipe, preventDefault);
+        this.#addEventDelegate(element, eventName, value, imports, preventDefault);
       } else {
+        // Skip framework-internal keys that are already processed
+        if (validMateriaProps.includes(key) || key === "$tagName") {
+          return;
+        }
+
+        // Check if the key is a valid property
+        const isValid =
+          validProps.includes(key) ||
+          key.startsWith("data") ||
+          key === "children";
+
+        if (!isValid) {
+          console.warn(
+            `Invalid property "${key}" on <${tagName}> element. This property is not a valid HTML attribute, DOM property, or framework property.`,
+          );
+          return;
+        }
+
         if (this.#isStringifiedFunction(value)) {
           value = this.#parseStringifiedFunction(value);
         }
 
         // If the value is a function and the key isn't an event, it's a binding
         if (typeof value === "function" && !this.#eventTypes.includes(key)) {
-          let binding = template.binding;
-          let triggers = template.triggers || [];
+          let binding = template.$_bind;
+          let triggers = template.$_triggers || [];
 
           // if the binding is undefined, we need to alert the user and continue the render
           if (!binding) {
-            // console.error(
-            //   `No binding found for function value: ${value.toString()}`
-            // );
+            console.error(
+              `No binding found for function value: ${value.toString()}`,
+            );
           } else {
             this.#processFunctionValue(
               element,
               key,
               value,
-              { ...pipe },
+              { ...imports },
               binding,
               triggers,
-              depth
+              depth,
             );
           }
         } else if (value !== null) {
-          this.#setElementAttribute(element, key, value, depth);
+          this.#setElementAttributesAndProperties(element, key, value, depth);
         }
       }
     });
@@ -1791,20 +1790,20 @@ class MateriaJS {
     element,
     property,
     func,
-    pipe,
+    imports,
     binding,
     triggers,
-    depth
+    depth,
   ) {
     let handlerElementId,
       preservedFunc = func;
 
-    let clientPipe = {};
+    let clientImports = {};
 
-    // loop through the keys of the pipe and set the value to the data attribute
-    if (pipe) {
-      for (const key in pipe) {
-        const value = pipe[key];
+    // loop through the keys of the imports and set the value to the data attribute
+    if (imports) {
+      for (const key in imports) {
+        const value = imports[key];
 
         if (
           value &&
@@ -1813,10 +1812,10 @@ class MateriaJS {
           value?.data &&
           value?.path
         ) {
-          // assign the data to the clientPipe
-          clientPipe[key] = value.data;
+          // assign the data to the clientImports
+          clientImports[key] = value.data;
         } else {
-          clientPipe[key] = value;
+          clientImports[key] = value;
         }
       }
     }
@@ -1829,7 +1828,7 @@ class MateriaJS {
       } else {
         handlerElementId = element.dataset.handlerId;
       }
-      pipe = clientPipe;
+      imports = clientImports;
     } else {
       if (!element.dataset.handlerId) {
         handlerElementId = this.#generateUniqueId();
@@ -1838,18 +1837,18 @@ class MateriaJS {
         handlerElementId = element.dataset.handlerId;
       }
       func = func.toString();
-      if (pipe) {
-        for (const key in pipe) {
-          const value = pipe[key];
+      if (imports) {
+        for (const key in imports) {
+          const value = imports[key];
           if (
             value &&
             typeof value === "object" &&
             value?.data &&
             value?.path
           ) {
-            pipe[key] = value.path;
+            imports[key] = value.path;
           } else {
-            pipe[key] = value;
+            imports[key] = value;
           }
         }
       }
@@ -1868,7 +1867,7 @@ class MateriaJS {
         element: handlerElementId,
         func,
         property,
-        pipe,
+        imports,
         bindings: bindingsArray, // Store all bindings this handler depends on
       });
     });
@@ -1914,10 +1913,10 @@ class MateriaJS {
       data = this.get(binding);
     }
 
-    const result = preservedFunc(data, elements, clientPipe);
+    const result = preservedFunc(data, clientImports, elements);
 
     if (result !== null) {
-      this.#setElementAttribute(element, property, result, depth);
+      this.#setElementAttributesAndProperties(element, property, result, depth);
     }
   }
 
@@ -1997,7 +1996,7 @@ class MateriaJS {
         for (const handlerId of handlerIds) {
           for (let key in this.#handlers) {
             this.#handlers[key] = this.#handlers[key].filter(
-              (bind) => bind.element !== handlerId
+              (bind) => bind.element !== handlerId,
             );
           }
         }
@@ -2026,7 +2025,7 @@ class MateriaJS {
 
     // Remove timestamps outside the time window
     const recentUpdates = updates.filter(
-      (timestamp) => now - timestamp < this.#circuitBreaker.timeWindow
+      (timestamp) => now - timestamp < this.#circuitBreaker.timeWindow,
     );
 
     // Add current update
@@ -2045,7 +2044,7 @@ class MateriaJS {
         this.#circuitBreaker.updates.delete(binding);
         console.warn(
           `Circuit breaker reset for binding "${binding}". ` +
-            `You can now update this binding again, but please fix the infinite loop.`
+            `You can now update this binding again, but please fix the infinite loop.`,
         );
       }, 5000);
 
@@ -2093,7 +2092,7 @@ class MateriaJS {
           // Remove element from DOM by handlerId
           if (bind.element) {
             const el = document.querySelector(
-              `[${DATA_HANDLER_ID}="${bind.element}"]`
+              `[${DATA_HANDLER_ID}="${bind.element}"]`,
             );
             if (el && el.parentNode) {
               el.parentNode.removeChild(el);
@@ -2114,7 +2113,7 @@ class MateriaJS {
           for (const handlerId of handlerIds) {
             for (const binding in this.#handlers) {
               this.#handlers[binding] = this.#handlers[binding].filter(
-                (handler) => handler.element !== handlerId
+                (handler) => handler.element !== handlerId,
               );
             }
           }
@@ -2127,7 +2126,7 @@ class MateriaJS {
             let delegateTarget = delegate.target;
             if (typeof delegateTarget === "string") {
               delegateTarget = document.querySelector(
-                `[${DATA_DELEGATE_ID}="${delegateTarget}"]`
+                `[${DATA_DELEGATE_ID}="${delegateTarget}"]`,
               );
             }
             if (
@@ -2167,7 +2166,7 @@ class MateriaJS {
         let handlerElement = handler.element;
         if (typeof handlerElement === "string") {
           handlerElement = document.querySelector(
-            `[${DATA_HANDLER_ID}="${handlerElement}"]`
+            `[${DATA_HANDLER_ID}="${handlerElement}"]`,
           );
         }
         if (!handlerElement || !document.body.contains(handlerElement)) {
@@ -2186,7 +2185,7 @@ class MateriaJS {
         let delegateTarget = delegate.target;
         if (typeof delegateTarget === "string") {
           delegateTarget = document.querySelector(
-            `[${DATA_DELEGATE_ID}="${delegateTarget}"]`
+            `[${DATA_DELEGATE_ID}="${delegateTarget}"]`,
           );
         }
         if (!delegateTarget || !document.body.contains(delegateTarget)) {

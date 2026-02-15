@@ -6,8 +6,8 @@
   "exports": {
     ".": "./materia.js",
     "./engine": "./engine.js",
-    "./elements": "./elements.html.js",
-    "./attributes": "./attributes.js"
+    "./validProps": "./validProps.js",
+    "./elements": "./elements.html.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
