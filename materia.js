@@ -791,6 +791,11 @@ class MateriaJS {
       children = [];
     }
 
+    // If children is a single object (Element), wrap it in an array
+    if (children && !Array.isArray(children) && typeof children === "object") {
+      children = [children];
+    }
+
     // check to see if the children value is valid
     if (!Array.isArray(children)) {
       console.error(
@@ -1621,7 +1626,13 @@ class MateriaJS {
           element.dataset.delegateId = this.#generateUniqueId();
         }
 
-        this.#addEventDelegate(element, eventName, value, imports, preventDefault);
+        this.#addEventDelegate(
+          element,
+          eventName,
+          value,
+          imports,
+          preventDefault,
+        );
       } else {
         // Skip framework-internal keys that are already processed
         if (validMateriaProps.includes(key) || key === "$tagName") {
