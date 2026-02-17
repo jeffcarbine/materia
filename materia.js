@@ -6,12 +6,12 @@ import {
   validEvents,
   validMutations,
   validDOMProperties,
-  validMateriaProps,
   stringDOMProperties,
   booleanDOMProperties,
   numberDOMProperties,
   objectDOMProperties,
   arrayDOMProperties,
+  validMateriaProps,
 } from "materiajs/validProps";
 
 // Standard Library Imports
@@ -52,6 +52,39 @@ export function $import(component, path) {
     [IMPORT_MARKER]: true,
     component,
     path,
+  };
+}
+
+// Symbol to mark bind objects
+const BIND_MARKER = Symbol("materiaBind");
+
+// Export BIND_MARKER for use in elements.html.js
+export { BIND_MARKER };
+
+/**
+ * Helper function to create property-level bindings
+ * @param {string|string[]} binding - The binding path(s) to track
+ * @param {Object|Function} importsOrHandler - Either imports object or handler function
+ * @param {Function} [handler] - Handler function if imports provided
+ * @returns {Object} An object marked for binding processing
+ */
+export function $bind(binding, importsOrHandler, handler) {
+  // Signature 1: $bind(binding, handler)
+  if (typeof importsOrHandler === "function") {
+    return {
+      [BIND_MARKER]: true,
+      binding,
+      imports: null,
+      handler: importsOrHandler,
+    };
+  }
+
+  // Signature 2: $bind(binding, imports, handler)
+  return {
+    [BIND_MARKER]: true,
+    binding,
+    imports: importsOrHandler,
+    handler,
   };
 }
 
@@ -800,7 +833,28 @@ class MateriaJS {
    * @param {Array} value - The value of the children.
    * @param {number} depth - The depth of the rendering.
    */
-  #setChildren(element, key, value, depth, parentBinding) {
+  #setChildren(element, key, value, depth) {
+    // Check if children is a $bind object
+    if (value && value[BIND_MARKER] === true) {
+      const bindConfig = value;
+      const propertyImports = bindConfig.imports
+        ? isServer
+          ? this.#encodeImports(bindConfig.imports)
+          : this.#encodeImports(bindConfig.imports)
+        : {};
+
+      this.#processFunctionValue(
+        element,
+        "children",
+        bindConfig.handler,
+        propertyImports,
+        bindConfig.binding,
+        [], // triggers can be added later if needed
+        depth,
+      );
+      return;
+    }
+
     let children = key === "children" ? value : [value];
 
     if (children === null) {
@@ -1085,7 +1139,7 @@ class MateriaJS {
       data = this.get(binding);
     }
 
-    value = func(data, imports, elements, $import);
+    value = func(data, imports, elements, { $import, $bind });
 
     // Always resolve element by handlerId
     if (typeof element === "string") {
@@ -1349,7 +1403,7 @@ class MateriaJS {
             try {
               if (imports)
                 imports = await this.#resolveIncompleteImports(imports);
-              func(match, imports, elements, event, $import);
+              func(match, imports, event, elements, { $import, $bind });
             } catch (error) {
               console.error("Error executing event handler:", error);
             }
@@ -1384,7 +1438,7 @@ class MateriaJS {
           delegate.func = func;
         }
 
-        func(target, imports, elements, $import);
+        func(target, imports, elements, { $import, $bind });
       });
     }
   }
@@ -1708,27 +1762,24 @@ class MateriaJS {
           value = this.#parseStringifiedFunction(value);
         }
 
-        // If the value is a function and the key isn't an event, it's a binding
-        if (typeof value === "function" && !this.#eventTypes.includes(key)) {
-          let binding = template.$_binding;
-          let triggers = template.$_triggers || [];
+        // Check if the value is a $bind object
+        if (value && value[BIND_MARKER] === true) {
+          const bindConfig = value;
+          const propertyImports = bindConfig.imports
+            ? isServer
+              ? this.#encodeImports(bindConfig.imports)
+              : this.#encodeImports(bindConfig.imports)
+            : {};
 
-          // if the binding is undefined, we need to alert the user and continue the render
-          if (!binding) {
-            console.error(
-              `No binding found for function value: ${value.toString()}`,
-            );
-          } else {
-            this.#processFunctionValue(
-              element,
-              key,
-              value,
-              { ...imports },
-              binding,
-              triggers,
-              depth,
-            );
-          }
+          this.#processFunctionValue(
+            element,
+            key,
+            bindConfig.handler,
+            propertyImports,
+            bindConfig.binding,
+            [], // triggers can be added later if needed
+            depth,
+          );
         } else if (value !== null) {
           this.#setElementAttributesAndProperties(element, key, value, depth);
         }
@@ -1966,7 +2017,10 @@ class MateriaJS {
       data = this.get(binding);
     }
 
-    const result = preservedFunc(data, clientImports, elements, $import);
+    const result = preservedFunc(data, clientImports, elements, {
+      $import,
+      $bind,
+    });
 
     if (result !== null) {
       this.#setElementAttributesAndProperties(element, property, result, depth);
@@ -2280,6 +2334,7 @@ const DATA_VCLASS = "data-vclass";
 const DATA_VCLASS_OBSERVED = "data-vclass-observed";
 const DEFAULT_IMPORT_MAP = {
   imports: {
+    materiajs: "/materia.js",
     "materiajs/": "/materiajs/",
     "@jeffcarbine/premmio/": "/node_modules/@jeffcarbine/premmio/",
   },

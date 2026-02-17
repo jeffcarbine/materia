@@ -3,11 +3,17 @@ import {
   validDOMProperties,
   validEvents,
   validMutations,
-  validMateriaProps,
 } from "materiajs/validProps";
+import { BIND_MARKER } from "materiajs";
 
 export class Element {
   initialize(config = {}, children = null) {
+    // Check if config is a $bind object - treat it as children binding
+    if (config && config[BIND_MARKER] === true) {
+      this.children = config;
+      return;
+    }
+
     if (typeof config === "object") {
       if (Array.isArray(config)) {
         // if it is an array, then it is handled as children
@@ -57,11 +63,7 @@ export class Element {
   }
 
   handleObjectConfig(config) {
-    const validProps = [
-      ...validHTMLAttributes,
-      ...validDOMProperties,
-      ...validMateriaProps,
-    ];
+    const validProps = [...validHTMLAttributes, ...validDOMProperties];
     const validEventsAndMutations = [...validEvents, ...validMutations];
 
     for (let key in config) {
