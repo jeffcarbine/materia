@@ -64,12 +64,22 @@ export { BIND_MARKER };
 /**
  * Helper function to create property-level bindings
  * @param {string|string[]} binding - The binding path(s) to track
- * @param {Object|Function} importsOrHandler - Either imports object or handler function
+ * @param {Object|Function} [importsOrHandler] - Either imports object or handler function
  * @param {Function} [handler] - Handler function if imports provided
  * @returns {Object} An object marked for binding processing
  */
 export function Bind(binding, importsOrHandler, handler) {
-  // Signature 1: Bind(binding, handler)
+  // Signature 1: Bind(binding) - shorthand for simple data binding
+  if (importsOrHandler === undefined && handler === undefined) {
+    return {
+      [BIND_MARKER]: true,
+      binding,
+      imports: null,
+      handler: ({ data }) => data,
+    };
+  }
+
+  // Signature 2: Bind(binding, handler)
   if (typeof importsOrHandler === "function") {
     return {
       [BIND_MARKER]: true,
@@ -79,7 +89,7 @@ export function Bind(binding, importsOrHandler, handler) {
     };
   }
 
-  // Signature 2: Bind(binding, imports, handler)
+  // Signature 3: Bind(binding, imports, handler)
   return {
     [BIND_MARKER]: true,
     binding,
@@ -763,9 +773,25 @@ class MateriaJS {
             ? bindConfig.binding.map((b) => this.get(b))
             : this.get(bindConfig.binding);
 
+          // Process imports to resolve Import markers
+          let processedImports = bindConfig.imports;
+          if (processedImports) {
+            if (Array.isArray(processedImports)) {
+              processedImports = processedImports.map((imp) =>
+                imp && imp[IMPORT_MARKER] === true ? imp.component : imp,
+              );
+            } else {
+              // Single import - keep as single value
+              processedImports =
+                processedImports && processedImports[IMPORT_MARKER] === true
+                  ? processedImports.component
+                  : processedImports;
+            }
+          }
+
           const result = bindConfig.handler({
             data: bindingData,
-            imports: {},
+            imports: processedImports,
             elements,
             core: { Import, Bind },
           });
@@ -795,9 +821,25 @@ class MateriaJS {
             ? bindConfig.binding.map((b) => this.get(b))
             : this.get(bindConfig.binding);
 
+          // Process imports to resolve Import markers
+          let processedImports = bindConfig.imports;
+          if (processedImports) {
+            if (Array.isArray(processedImports)) {
+              processedImports = processedImports.map((imp) =>
+                imp && imp[IMPORT_MARKER] === true ? imp.component : imp,
+              );
+            } else {
+              // Single import - keep as single value
+              processedImports =
+                processedImports && processedImports[IMPORT_MARKER] === true
+                  ? processedImports.component
+                  : processedImports;
+            }
+          }
+
           const result = handler({
             data: bindingData,
-            imports: {},
+            imports: processedImports,
             elements,
             core: { Import, Bind },
           });
@@ -817,9 +859,25 @@ class MateriaJS {
             ? bindConfig.binding.map((b) => this.get(b))
             : this.get(bindConfig.binding);
 
+          // Process imports to resolve Import markers
+          let processedImports = bindConfig.imports;
+          if (processedImports) {
+            if (Array.isArray(processedImports)) {
+              processedImports = processedImports.map((imp) =>
+                imp && imp[IMPORT_MARKER] === true ? imp.component : imp,
+              );
+            } else {
+              // Single import - keep as single value
+              processedImports =
+                processedImports && processedImports[IMPORT_MARKER] === true
+                  ? processedImports.component
+                  : processedImports;
+            }
+          }
+
           const result = bindConfig.handler({
             data: bindingData,
-            imports: {},
+            imports: processedImports,
             elements,
             core: { Import, Bind },
           });
@@ -849,9 +907,25 @@ class MateriaJS {
             ? bindConfig.binding.map((b) => this.get(b))
             : this.get(bindConfig.binding);
 
+          // Process imports to resolve Import markers
+          let processedImports = bindConfig.imports;
+          if (processedImports) {
+            if (Array.isArray(processedImports)) {
+              processedImports = processedImports.map((imp) =>
+                imp && imp[IMPORT_MARKER] === true ? imp.component : imp,
+              );
+            } else {
+              // Single import - keep as single value
+              processedImports =
+                processedImports && processedImports[IMPORT_MARKER] === true
+                  ? processedImports.component
+                  : processedImports;
+            }
+          }
+
           const result = handler({
             data: bindingData,
-            imports: {},
+            imports: processedImports,
             elements,
             core: { Import, Bind },
           });
@@ -903,9 +977,25 @@ class MateriaJS {
               ? bindConfig.binding.map((b) => this.get(b))
               : this.get(bindConfig.binding);
 
+            // Process imports to resolve Import markers
+            let processedImports = bindConfig.imports;
+            if (processedImports) {
+              if (Array.isArray(processedImports)) {
+                processedImports = processedImports.map((imp) =>
+                  imp && imp[IMPORT_MARKER] === true ? imp.component : imp,
+                );
+              } else {
+                // Single import - keep as single value
+                processedImports =
+                  processedImports && processedImports[IMPORT_MARKER] === true
+                    ? processedImports.component
+                    : processedImports;
+              }
+            }
+
             const result = bindConfig.handler({
               data: bindingData,
-              imports: {},
+              imports: processedImports,
               elements,
               core: { Import, Bind },
             });
@@ -925,9 +1015,25 @@ class MateriaJS {
               ? bindConfig.binding.map((b) => this.get(b))
               : this.get(bindConfig.binding);
 
+            // Process imports to resolve Import markers
+            let processedImports = bindConfig.imports;
+            if (processedImports) {
+              if (Array.isArray(processedImports)) {
+                processedImports = processedImports.map((imp) =>
+                  imp && imp[IMPORT_MARKER] === true ? imp.component : imp,
+                );
+              } else {
+                // Single import - keep as single value
+                processedImports =
+                  processedImports && processedImports[IMPORT_MARKER] === true
+                    ? processedImports.component
+                    : processedImports;
+              }
+            }
+
             const result = bindConfig.handler({
               data: bindingData,
-              imports: {},
+              imports: processedImports,
               elements,
               core: { Import, Bind },
             });
@@ -2277,19 +2383,23 @@ class MateriaJS {
     let handlerElementId,
       preservedFunc = func;
 
-    let clientImports = {};
+    let clientImports;
 
-    // loop through the keys of the imports and set the value to the data attribute
+    // Process imports - preserve single vs array structure (like binding data)
     if (imports) {
-      for (const key in imports) {
-        const value = imports[key];
-
-        if (value && value[IMPORT_MARKER] === true) {
-          // Handle Import format: Import(Component, "/path")
-          clientImports[key] = value.component;
-        } else {
-          clientImports[key] = value;
-        }
+      if (Array.isArray(imports)) {
+        clientImports = imports.map((value) => {
+          if (value && value[IMPORT_MARKER] === true) {
+            return value.component;
+          }
+          return value;
+        });
+      } else {
+        // Single import - keep as single value
+        clientImports =
+          imports && imports[IMPORT_MARKER] === true
+            ? imports.component
+            : imports;
       }
     }
 
@@ -2311,14 +2421,17 @@ class MateriaJS {
       }
       func = func.toString();
       if (imports) {
-        for (const key in imports) {
-          const value = imports[key];
-          if (value && value[IMPORT_MARKER] === true) {
-            // Handle Import format: Import(Component, "/path")
-            imports[key] = value.path;
-          } else {
-            imports[key] = value;
-          }
+        if (Array.isArray(imports)) {
+          imports = imports.map((value) => {
+            if (value && value[IMPORT_MARKER] === true) {
+              return value.path;
+            }
+            return value;
+          });
+        } else {
+          // Single import - keep as single value
+          imports =
+            imports && imports[IMPORT_MARKER] === true ? imports.path : imports;
         }
       }
     }
