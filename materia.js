@@ -1159,7 +1159,12 @@ class MateriaJS {
       data = this.get(binding);
     }
 
-    value = func(data, imports, elements, { $import, $bind });
+    value = func({
+      data,
+      imports,
+      elements,
+      core: { $import, $bind },
+    });
 
     // Always resolve element by handlerId
     if (typeof element === "string") {
@@ -1423,7 +1428,13 @@ class MateriaJS {
             try {
               if (imports)
                 imports = await this.#resolveIncompleteImports(imports);
-              func(match, imports, event, elements, { $import, $bind });
+              func({
+                target: match,
+                imports,
+                elements,
+                event,
+                core: { $import, $bind },
+              });
             } catch (error) {
               console.error("Error executing event handler:", error);
             }
@@ -1458,7 +1469,12 @@ class MateriaJS {
           delegate.func = func;
         }
 
-        func(target, imports, elements, { $import, $bind });
+        func({
+          target,
+          imports,
+          elements,
+          core: { $import, $bind },
+        });
       });
     }
   }
@@ -2008,9 +2024,11 @@ class MateriaJS {
       data = this.get(binding);
     }
 
-    const result = preservedFunc(data, clientImports, elements, {
-      $import,
-      $bind,
+    const result = preservedFunc({
+      data,
+      imports: clientImports,
+      elements,
+      core: { $import, $bind },
     });
 
     if (result !== null) {
