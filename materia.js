@@ -741,6 +741,295 @@ class MateriaJS {
   }
 
   /**
+   * Helper method to process a collection template with $bind objects
+   * @param {Object|Array} template - The collection template
+   * @param {string} key - The property key for applying results
+   * @param {Array} bindConfigs - Array of [path, config] pairs for stored bind configurations
+   * @returns {Object|Array} The processed value
+   */
+  #processCollectionTemplate(template, key, bindConfigs = []) {
+    // Reconstruct the bind configs map
+    const bindConfigsMap = new Map(bindConfigs);
+
+    const processedValue = Array.isArray(template) ? [] : {};
+
+    if (Array.isArray(template)) {
+      for (let i = 0; i < template.length; i++) {
+        const item = template[i];
+        // Check if item has BIND_MARKER (for initial render)
+        if (item && item[BIND_MARKER] === true) {
+          const bindConfig = item;
+          const bindingData = Array.isArray(bindConfig.binding)
+            ? bindConfig.binding.map((b) => this.get(b))
+            : this.get(bindConfig.binding);
+
+          const result = bindConfig.handler({
+            data: bindingData,
+            imports: {},
+            elements,
+            core: { $import, $bind },
+          });
+          processedValue[i] = result;
+        } else if (bindConfigsMap.has(String(i))) {
+          // Check if we have a stored bind config for this path
+          let bindConfig = bindConfigsMap.get(String(i));
+
+          // Parse stringified handler if needed
+          let handler = bindConfig.handler;
+          if (!handler) {
+            console.error(
+              `[processCollectionTemplate] No handler found for index ${i}`,
+              bindConfig,
+            );
+            processedValue[i] = item;
+            continue;
+          }
+          if (typeof handler === "string") {
+            handler = this.#parseStringifiedFunction(handler);
+            // Cache the parsed function back in the map
+            bindConfig = { ...bindConfig, handler };
+            bindConfigsMap.set(String(i), bindConfig);
+          }
+
+          const bindingData = Array.isArray(bindConfig.binding)
+            ? bindConfig.binding.map((b) => this.get(b))
+            : this.get(bindConfig.binding);
+
+          const result = handler({
+            data: bindingData,
+            imports: {},
+            elements,
+            core: { $import, $bind },
+          });
+          processedValue[i] = result;
+        } else {
+          processedValue[i] = item;
+        }
+      }
+    } else {
+      // Object
+      for (const objKey in template) {
+        const item = template[objKey];
+        // Check if item has BIND_MARKER (for initial render)
+        if (item && item[BIND_MARKER] === true) {
+          const bindConfig = item;
+          const bindingData = Array.isArray(bindConfig.binding)
+            ? bindConfig.binding.map((b) => this.get(b))
+            : this.get(bindConfig.binding);
+
+          const result = bindConfig.handler({
+            data: bindingData,
+            imports: {},
+            elements,
+            core: { $import, $bind },
+          });
+          processedValue[objKey] = result;
+        } else if (bindConfigsMap.has(objKey)) {
+          // Check if we have a stored bind config for this path
+          let bindConfig = bindConfigsMap.get(objKey);
+
+          // Parse stringified handler if needed
+          let handler = bindConfig.handler;
+          if (!handler) {
+            console.error(
+              `[processCollectionTemplate] No handler found for key ${objKey}`,
+              bindConfig,
+            );
+            processedValue[objKey] = item;
+            continue;
+          }
+          if (typeof handler === "string") {
+            handler = this.#parseStringifiedFunction(handler);
+            // Cache the parsed function back in the map
+            bindConfig = { ...bindConfig, handler };
+            bindConfigsMap.set(objKey, bindConfig);
+          }
+
+          const bindingData = Array.isArray(bindConfig.binding)
+            ? bindConfig.binding.map((b) => this.get(b))
+            : this.get(bindConfig.binding);
+
+          const result = handler({
+            data: bindingData,
+            imports: {},
+            elements,
+            core: { $import, $bind },
+          });
+          processedValue[objKey] = result;
+        } else {
+          processedValue[objKey] = item;
+        }
+      }
+    }
+
+    return processedValue;
+  }
+
+  /**
+   * Processes an object or array that may contain $bind values
+   * @param {Element} element - The element to process
+   * @param {string} key - The property key ($style, $classList, etc)
+   * @param {Object|Array} value - The object or array to process
+   * @param {number} depth - The rendering depth
+   * @returns {Object|Array} The processed value with bindings registered
+   */
+  #processBindableCollection(element, key, value, depth) {
+    const hasBindings = (() => {
+      if (Array.isArray(value)) {
+        return value.some((item) => item && item[BIND_MARKER] === true);
+      } else if (typeof value === "object" && value !== null) {
+        return Object.values(value).some(
+          (item) => item && item[BIND_MARKER] === true,
+        );
+      }
+      return false;
+    })();
+
+    if (!hasBindings) {
+      return value; // No bindings, return as-is
+    }
+
+    // Create a handler function that re-evaluates the collection
+    const collectionHandler = () => {
+      const processedValue = Array.isArray(value) ? [] : {};
+
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+          const item = value[i];
+          if (item && item[BIND_MARKER] === true) {
+            // This is a $bind - evaluate it
+            const bindConfig = item;
+            const bindingData = Array.isArray(bindConfig.binding)
+              ? bindConfig.binding.map((b) => this.get(b))
+              : this.get(bindConfig.binding);
+
+            const result = bindConfig.handler({
+              data: bindingData,
+              imports: {},
+              elements,
+              core: { $import, $bind },
+            });
+            processedValue[i] = result;
+          } else {
+            processedValue[i] = item;
+          }
+        }
+      } else {
+        // Object
+        for (const objKey in value) {
+          const item = value[objKey];
+          if (item && item[BIND_MARKER] === true) {
+            // This is a $bind - evaluate it
+            const bindConfig = item;
+            const bindingData = Array.isArray(bindConfig.binding)
+              ? bindConfig.binding.map((b) => this.get(b))
+              : this.get(bindConfig.binding);
+
+            const result = bindConfig.handler({
+              data: bindingData,
+              imports: {},
+              elements,
+              core: { $import, $bind },
+            });
+            processedValue[objKey] = result;
+          } else {
+            processedValue[objKey] = item;
+          }
+        }
+      }
+
+      // Apply the processed value to the element
+      if (key === "$style") {
+        Object.assign(element.style, processedValue);
+      } else if (key === "$dataset") {
+        Object.assign(element.dataset, processedValue);
+      } else if (key === "$classList") {
+        element.className = ""; // Clear existing classes
+        // Filter out falsy values and ensure all values are valid strings
+        const validClasses = processedValue
+          .filter((cls) => cls && typeof cls === "string" && cls.trim() !== "")
+          .flatMap((cls) => cls.split(/\s+/));
+        if (validClasses.length > 0) {
+          element.classList.add(...validClasses);
+        }
+      }
+
+      return processedValue;
+    };
+
+    // Register handlers for all bindings found
+    const bindings = [];
+    const bindConfigsMap = new Map(); // Store bind configs by path
+
+    const collectBindings = (item, path) => {
+      if (item && item[BIND_MARKER] === true) {
+        const bindConfig = item;
+        if (Array.isArray(bindConfig.binding)) {
+          bindings.push(...bindConfig.binding);
+        } else {
+          bindings.push(bindConfig.binding);
+        }
+        // Store the bind config with its path in the template
+        // Always stringify the handler function for serialization (even on client)
+        const stringifiedHandler = this.#stringifyFunction(bindConfig.handler);
+        bindConfigsMap.set(String(path), {
+          binding: bindConfig.binding,
+          handler: stringifiedHandler,
+          imports: bindConfig.imports,
+        });
+      }
+    };
+
+    if (Array.isArray(value)) {
+      value.forEach((item, i) => collectBindings(item, i));
+    } else {
+      Object.keys(value).forEach((objKey) =>
+        collectBindings(value[objKey], objKey),
+      );
+    }
+
+    // Register the handler for each unique binding
+    const uniqueBindings = [...new Set(bindings)];
+    uniqueBindings.forEach((binding) => {
+      if (!element.dataset.handlerId) {
+        element.dataset.handlerId = this.#generateUniqueId();
+      }
+
+      const handlerElementId = element.dataset.handlerId;
+
+      if (!this.#handlers[binding]) {
+        this.#handlers[binding] = [];
+      }
+
+      const bindConfigsArray = Array.from(bindConfigsMap.entries());
+
+      this.#handlers[binding].push({
+        element: handlerElementId,
+        func: collectionHandler,
+        property: key,
+        imports: {},
+        bindings: [binding],
+        isCollectionHandler: true,
+        collectionTemplate: value,
+        bindConfigs: bindConfigsArray, // Store as [[path, config], ...]
+      });
+
+      // Track element association
+      let handlerIds = this.#elementHandlerMap.get(element);
+      if (!handlerIds) {
+        handlerIds = new Set();
+        this.#elementHandlerMap.set(element, handlerIds);
+      }
+      handlerIds.add(handlerElementId);
+    });
+
+    // Execute the handler once to set initial values and return the result
+    const initialValue = collectionHandler();
+
+    return initialValue;
+  }
+
+  /**
    * Sets an attribute or DOM property on an element.
    * @param {Element} element - The element to set the attribute/property on.
    * @param {string} key - The key of the attribute/property.
@@ -770,22 +1059,51 @@ class MateriaJS {
       }
       // Object properties
       else if (objectDOMProperties.includes(key)) {
+        // Check if value contains $bind objects
+        const processedValue = this.#processBindableCollection(
+          element,
+          key,
+          value,
+          depth,
+        );
+
         if (key === "$style") {
           // Handle style object
-          if (typeof value === "object") {
-            Object.assign(element.style, value);
+          if (typeof processedValue === "object") {
+            Object.assign(element.style, processedValue);
           }
         } else if (key === "$dataset") {
           // Handle dataset object
-          if (typeof value === "object") {
-            Object.assign(element.dataset, value);
+          if (typeof processedValue === "object") {
+            Object.assign(element.dataset, processedValue);
           }
         }
       }
       // Array properties
       else if (arrayDOMProperties.includes(key)) {
-        if (key === "$classList" && Array.isArray(value)) {
-          element.classList.add(...value);
+        // Check if value contains $bind objects
+        const processedValue = this.#processBindableCollection(
+          element,
+          key,
+          value,
+          depth,
+        );
+
+        if (key === "$classList" && Array.isArray(processedValue)) {
+          // Filter out falsy values and ensure all values are valid strings without whitespace
+          const validClasses = processedValue
+            .filter(
+              (cls) => cls && typeof cls === "string" && cls.trim() !== "",
+            )
+            .flatMap((cls) => cls.split(/\s+/)); // Split any space-separated classes
+          if (validClasses.length > 0) {
+            // Clear existing classes before adding new ones (to replace, not accumulate)
+            element.className = "";
+            element.classList.add(...validClasses);
+          } else {
+            // Clear classes if no valid ones
+            element.className = "";
+          }
         }
       }
       // Special case: contentEditable (can be string or boolean)
@@ -1130,41 +1448,60 @@ class MateriaJS {
    * @param {Object} handler - The handler to process.
    */
   async #handle(binding, handler) {
-    let { element, func, property, imports, bindings } = handler;
+    let {
+      element,
+      func,
+      property,
+      imports,
+      bindings,
+      isCollectionHandler,
+      collectionTemplate,
+      bindConfigs,
+    } = handler;
 
     let value;
 
-    // for server-side binding, the func will be a string so we
-    // will need to parse it
-    if (typeof func === "string") {
-      func = new Function("data", `return ${func}`)(this.#data);
-      handler.func = func;
-    }
-
-    // check to see if any of the imports values are strings that need to be imported
-    if (imports) {
-      imports = await this.#resolveIncompleteImports(imports);
-    }
-
-    // Construct data based on whether this handler uses array bindings
-    let data;
-    if (bindings && bindings.length > 1) {
-      // Array binding - construct object with all bound values
-      data = [];
-      bindings.forEach((b, i) => {
-        data[i] = this.get(b);
-      });
+    // Handle collection handlers specially
+    if (isCollectionHandler && collectionTemplate) {
+      // Process the collection template directly, passing the stored bind configs
+      value = this.#processCollectionTemplate(
+        collectionTemplate,
+        property,
+        bindConfigs,
+      );
     } else {
-      // Single binding - use the binding value directly
-      data = this.get(binding);
-    }
+      // for server-side binding, the func will be a string so we
+      // will need to parse it
+      if (typeof func === "string") {
+        func = new Function("data", `return ${func}`)(this.#data);
+        handler.func = func;
+      }
 
-    value = func({
-      data,
-      imports,
-      elements,
-      core: { $import, $bind },
-    });
+      // check to see if any of the imports values are strings that need to be imported
+      if (imports) {
+        imports = await this.#resolveIncompleteImports(imports);
+      }
+
+      // Construct data based on whether this handler uses array bindings
+      let data;
+      if (bindings && bindings.length > 1) {
+        // Array binding - construct object with all bound values
+        data = [];
+        bindings.forEach((b, i) => {
+          data[i] = this.get(b);
+        });
+      } else {
+        // Single binding - use the binding value directly
+        data = this.get(binding);
+      }
+
+      value = func({
+        data,
+        imports,
+        elements,
+        core: { $import, $bind },
+      });
+    }
 
     // Always resolve element by handlerId
     if (typeof element === "string") {
@@ -1428,6 +1765,7 @@ class MateriaJS {
             try {
               if (imports)
                 imports = await this.#resolveIncompleteImports(imports);
+
               func({
                 target: match,
                 imports,
