@@ -8,7 +8,7 @@ import { BIND_MARKER } from "materiajs";
 
 export class Element {
   initialize(config = {}, children = null) {
-    // Check if config is a $bind object - treat it as children binding
+    // Check if config is a Bind object - treat it as children binding
     if (config && config[BIND_MARKER] === true) {
       this.children = config;
       return;

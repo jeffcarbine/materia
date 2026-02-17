@@ -47,7 +47,7 @@ const IMPORT_MARKER = Symbol("materiaImport");
  * @param {string} path - The path to import from
  * @returns {Object} An object marked for import processing
  */
-export function $import(component, path) {
+export function Import(component, path) {
   return {
     [IMPORT_MARKER]: true,
     component,
@@ -68,8 +68,8 @@ export { BIND_MARKER };
  * @param {Function} [handler] - Handler function if imports provided
  * @returns {Object} An object marked for binding processing
  */
-export function $bind(binding, importsOrHandler, handler) {
-  // Signature 1: $bind(binding, handler)
+export function Bind(binding, importsOrHandler, handler) {
+  // Signature 1: Bind(binding, handler)
   if (typeof importsOrHandler === "function") {
     return {
       [BIND_MARKER]: true,
@@ -79,7 +79,7 @@ export function $bind(binding, importsOrHandler, handler) {
     };
   }
 
-  // Signature 2: $bind(binding, imports, handler)
+  // Signature 2: Bind(binding, imports, handler)
   return {
     [BIND_MARKER]: true,
     binding,
@@ -741,7 +741,7 @@ class MateriaJS {
   }
 
   /**
-   * Helper method to process a collection template with $bind objects
+   * Helper method to process a collection template with Bind objects
    * @param {Object|Array} template - The collection template
    * @param {string} key - The property key for applying results
    * @param {Array} bindConfigs - Array of [path, config] pairs for stored bind configurations
@@ -767,7 +767,7 @@ class MateriaJS {
             data: bindingData,
             imports: {},
             elements,
-            core: { $import, $bind },
+            core: { Import, Bind },
           });
           processedValue[i] = result;
         } else if (bindConfigsMap.has(String(i))) {
@@ -799,7 +799,7 @@ class MateriaJS {
             data: bindingData,
             imports: {},
             elements,
-            core: { $import, $bind },
+            core: { Import, Bind },
           });
           processedValue[i] = result;
         } else {
@@ -821,7 +821,7 @@ class MateriaJS {
             data: bindingData,
             imports: {},
             elements,
-            core: { $import, $bind },
+            core: { Import, Bind },
           });
           processedValue[objKey] = result;
         } else if (bindConfigsMap.has(objKey)) {
@@ -853,7 +853,7 @@ class MateriaJS {
             data: bindingData,
             imports: {},
             elements,
-            core: { $import, $bind },
+            core: { Import, Bind },
           });
           processedValue[objKey] = result;
         } else {
@@ -866,7 +866,7 @@ class MateriaJS {
   }
 
   /**
-   * Processes an object or array that may contain $bind values
+   * Processes an object or array that may contain Bind values
    * @param {Element} element - The element to process
    * @param {string} key - The property key ($style, $classList, etc)
    * @param {Object|Array} value - The object or array to process
@@ -897,7 +897,7 @@ class MateriaJS {
         for (let i = 0; i < value.length; i++) {
           const item = value[i];
           if (item && item[BIND_MARKER] === true) {
-            // This is a $bind - evaluate it
+            // This is a Bind - evaluate it
             const bindConfig = item;
             const bindingData = Array.isArray(bindConfig.binding)
               ? bindConfig.binding.map((b) => this.get(b))
@@ -907,7 +907,7 @@ class MateriaJS {
               data: bindingData,
               imports: {},
               elements,
-              core: { $import, $bind },
+              core: { Import, Bind },
             });
             processedValue[i] = result;
           } else {
@@ -919,7 +919,7 @@ class MateriaJS {
         for (const objKey in value) {
           const item = value[objKey];
           if (item && item[BIND_MARKER] === true) {
-            // This is a $bind - evaluate it
+            // This is a Bind - evaluate it
             const bindConfig = item;
             const bindingData = Array.isArray(bindConfig.binding)
               ? bindConfig.binding.map((b) => this.get(b))
@@ -929,7 +929,7 @@ class MateriaJS {
               data: bindingData,
               imports: {},
               elements,
-              core: { $import, $bind },
+              core: { Import, Bind },
             });
             processedValue[objKey] = result;
           } else {
@@ -1059,7 +1059,7 @@ class MateriaJS {
       }
       // Object properties
       else if (objectDOMProperties.includes(key)) {
-        // Check if value contains $bind objects
+        // Check if value contains Bind objects
         const processedValue = this.#processBindableCollection(
           element,
           key,
@@ -1081,7 +1081,7 @@ class MateriaJS {
       }
       // Array properties
       else if (arrayDOMProperties.includes(key)) {
-        // Check if value contains $bind objects
+        // Check if value contains Bind objects
         const processedValue = this.#processBindableCollection(
           element,
           key,
@@ -1173,7 +1173,7 @@ class MateriaJS {
    * @param {number} depth - The depth of the rendering.
    */
   #setChildren(element, key, value, depth) {
-    // Check if children is a $bind object
+    // Check if children is a Bind object
     if (value && value[BIND_MARKER] === true) {
       const bindConfig = value;
       const propertyImports = bindConfig.imports
@@ -1251,7 +1251,7 @@ class MateriaJS {
       if (typeof imports[key] === "function") {
         imports[key] = this.#stringifyFunction(imports[key]);
       } else if (imports[key] && imports[key][IMPORT_MARKER] === true) {
-        // Handle $import format: $import(Component, "/path")
+        // Handle Import format: Import(Component, "/path")
         if (imports[key].path && !imports[key].path.startsWith(IMPORT_PREFIX)) {
           imports[key].path = `${IMPORT_PREFIX}${imports[key].path}`;
         }
@@ -1355,7 +1355,7 @@ class MateriaJS {
   async #resolveIncompleteImports(imports) {
     for (let key in imports) {
       if (imports[key] && imports[key][IMPORT_MARKER] === true) {
-        // Handle $import format: $import(Component, "import::/path")
+        // Handle Import format: Import(Component, "import::/path")
         if (imports[key].path && imports[key].path.startsWith(IMPORT_PREFIX)) {
           let path = imports[key].path.replace(IMPORT_PREFIX, "");
 
@@ -1499,7 +1499,7 @@ class MateriaJS {
         data,
         imports,
         elements,
-        core: { $import, $bind },
+        core: { Import, Bind },
       });
     }
 
@@ -1771,7 +1771,7 @@ class MateriaJS {
                 imports,
                 elements,
                 event,
-                core: { $import, $bind },
+                core: { Import, Bind },
               });
             } catch (error) {
               console.error("Error executing event handler:", error);
@@ -1811,7 +1811,7 @@ class MateriaJS {
           target,
           imports,
           elements,
-          core: { $import, $bind },
+          core: { Import, Bind },
         });
       });
     }
@@ -2136,7 +2136,7 @@ class MateriaJS {
           value = this.#parseStringifiedFunction(value);
         }
 
-        // Check if the value is a $bind object
+        // Check if the value is a Bind object
         if (value && value[BIND_MARKER] === true) {
           const bindConfig = value;
           const propertyImports = bindConfig.imports
@@ -2285,7 +2285,7 @@ class MateriaJS {
         const value = imports[key];
 
         if (value && value[IMPORT_MARKER] === true) {
-          // Handle $import format: $import(Component, "/path")
+          // Handle Import format: Import(Component, "/path")
           clientImports[key] = value.component;
         } else {
           clientImports[key] = value;
@@ -2314,7 +2314,7 @@ class MateriaJS {
         for (const key in imports) {
           const value = imports[key];
           if (value && value[IMPORT_MARKER] === true) {
-            // Handle $import format: $import(Component, "/path")
+            // Handle Import format: Import(Component, "/path")
             imports[key] = value.path;
           } else {
             imports[key] = value;
@@ -2366,7 +2366,7 @@ class MateriaJS {
       data,
       imports: clientImports,
       elements,
-      core: { $import, $bind },
+      core: { Import, Bind },
     });
 
     if (result !== null) {
