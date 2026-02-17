@@ -101,12 +101,11 @@ class MateriaJS {
   constructor(params) {
     if (!isServer) {
       // Get the data and handlers from the params
-      const { data, handlers, triggers, delegate } = params;
+      const { data, handlers, delegate } = params;
 
       // Set the data and handlers
       this.#data = data;
       this.#handlers = handlers;
-      this.#triggers = triggers;
       this.#delegate = delegate;
 
       this.#enableEventDelegation();
@@ -121,11 +120,6 @@ class MateriaJS {
    * The handlers object for the template engine.
    */
   #handlers = {};
-
-  /**
-   * The triggers object for the template engine.
-   */
-  #triggers = {};
 
   /**
    * WeakMap to track element -> Set of handler IDs.
@@ -637,31 +631,59 @@ class MateriaJS {
   }
 
   /**
+   * Extracts all parent binding paths from a binding string, including the binding itself
+   * @param {string} binding - The binding to extract parents from
+   * @returns {string[]} Array of binding paths from root to leaf
+   * @example
+   * getParentBindings("user.name.first") // ["user", "user.name", "user.name.first"]
+   * getParentBindings("user.scores[2]") // ["user", "user.scores", "user.scores[2]"]
+   * getParentBindings("user.scores[2].time") // ["user", "user.scores", "user.scores[2]", "user.scores[2].time"]
+   */
+  #getParentBindings(binding) {
+    const parents = [];
+    const parts = binding.split(/(?=\.)|(?=\[)/); // Split on . or [ but keep delimiters
+
+    let current = "";
+    for (const part of parts) {
+      current += part;
+      parents.push(current);
+    }
+
+    return parents;
+  }
+
+  /**
    * Runs the handlers if a binding is updated via set or push
    * @param {string} binding - The binding to update.
    */
   #handleBindingUpdate(binding) {
-    const checkHandlers = async (binding) => {
-      if (this.#handlers[binding]) {
-        for (const handler of this.#handlers[binding]) {
-          this.#handle(binding, handler);
+    if (isServer) return;
+
+    // Get all parent bindings including the current one
+    const allBindings = this.#getParentBindings(binding);
+
+    // Collect all handlers that need to be executed
+    const executions = [];
+
+    for (const bindingPath of allBindings) {
+      // Collect handlers
+      if (this.#handlers[bindingPath]) {
+        for (const handler of this.#handlers[bindingPath]) {
+          executions.push({
+            binding: bindingPath,
+            handler,
+            depth: bindingPath.split(/[\.\[]/).length,
+          });
         }
       }
-    };
+    }
 
-    const checkTriggers = async (binding) => {
-      if (this.#triggers[binding]) {
-        for (const trigger of this.#triggers[binding]) {
-          const { binding, handler } = trigger;
+    // Sort by depth (shallowest first) to render parents before children
+    executions.sort((a, b) => a.depth - b.depth);
 
-          this.#handle(binding, handler);
-        }
-      }
-    };
-
-    if (!isServer) {
-      checkHandlers(binding);
-      checkTriggers(binding);
+    // Execute handlers in order
+    for (const { binding, handler } of executions) {
+      this.#handle(binding, handler);
     }
   }
 
@@ -706,7 +728,6 @@ class MateriaJS {
     return {
       data: this.#data,
       handlers: this.#handlers,
-      triggers: this.#triggers,
       delegate: this.#delegate,
     };
   }
@@ -849,7 +870,6 @@ class MateriaJS {
         bindConfig.handler,
         propertyImports,
         bindConfig.binding,
-        [], // triggers can be added later if needed
         depth,
       );
       return;
@@ -1777,7 +1797,6 @@ class MateriaJS {
             bindConfig.handler,
             propertyImports,
             bindConfig.binding,
-            [], // triggers can be added later if needed
             depth,
           );
         } else if (value !== null) {
@@ -1900,15 +1919,7 @@ class MateriaJS {
    * @param {number} depth - The depth of the rendering.
    * @returns {void}
    */
-  #processFunctionValue(
-    element,
-    property,
-    func,
-    imports,
-    binding,
-    triggers,
-    depth,
-  ) {
+  #processFunctionValue(element, property, func, imports, binding, depth) {
     let handlerElementId,
       preservedFunc = func;
 
@@ -1986,26 +1997,6 @@ class MateriaJS {
       handlerIds.add(handlerElementId);
     }
 
-    // Handle triggers for each binding
-    if (triggers.length > 0) {
-      bindingsArray.forEach((singleBinding) => {
-        triggers.forEach((trigger) => {
-          const triggerBinding = `${singleBinding}.${trigger}`;
-
-          if (!this.#triggers[triggerBinding]) {
-            this.#triggers[triggerBinding] = [];
-          }
-
-          // Get the handler we just added for this binding
-          const handlerIndex = this.#handlers[singleBinding].length - 1;
-          this.#triggers[triggerBinding].push({
-            binding: singleBinding,
-            handler: this.#handlers[singleBinding][handlerIndex],
-          });
-        });
-      });
-    }
-
     // Construct data object for the function call
     let data;
     if (Array.isArray(binding)) {
@@ -2054,12 +2045,10 @@ class MateriaJS {
         const data = JSON.parse("${this.#stringifyObject(this.#data)}");
           
         const handlers = JSON.parse("${this.#stringifyObject(this.#handlers)}");
-
-        const triggers = JSON.parse("${this.#stringifyObject(this.#triggers)}");
           
         const delegate = JSON.parse("${this.#stringifyObject(this.#delegate)}");
           
-        window.Materia = new MateriaJS({data, handlers, triggers, delegate});
+        window.Materia = new MateriaJS({data, handlers, delegate});
 
         Materia.loadHandler();
       `;

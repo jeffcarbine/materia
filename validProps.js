@@ -569,4 +569,4 @@ export const validMutations = [
   "subtree",
 ];
 
-export const validMateriaProps = ["$_binding", "$_triggers", "$_imports"];
+export const validMateriaProps = ["$_binding", "$_imports"];
