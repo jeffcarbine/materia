@@ -1361,6 +1361,13 @@ class MateriaJS {
         if (imports[key].path && !imports[key].path.startsWith(IMPORT_PREFIX)) {
           imports[key].path = `${IMPORT_PREFIX}${imports[key].path}`;
         }
+        // Extract component name before serialization loses the function reference
+        const componentRef = imports[key].component;
+        if (typeof componentRef === "function") {
+          imports[key].componentName = componentRef.name;
+        } else if (typeof componentRef === "string") {
+          imports[key].componentName = componentRef;
+        }
       }
     }
     return imports;
@@ -1472,10 +1479,18 @@ class MateriaJS {
             continue;
           }
 
+          // Get the component name/reference from the Import marker
+          const componentRef = imports[key].component;
+          const componentName =
+            typeof componentRef === "function"
+              ? componentRef.name
+              : componentRef;
+
           // Check if the component is already imported
           if (this.#importCache[path]) {
             imports[key] =
-              this.#importCache[path][key] || this.#importCache[path].default;
+              this.#importCache[path][componentName] ||
+              this.#importCache[path].default;
           } else {
             try {
               // Dynamically import the component
@@ -1485,16 +1500,66 @@ class MateriaJS {
               this.#importCache[path] = module;
 
               // Check for named export or default export
-              const component = module[key] || module.default;
+              const component = module[componentName] || module.default;
 
               if (component) {
                 imports[key] = component;
               } else {
-                console.error(`Component ${key} not found in ${path}`);
+                console.error(
+                  `Component ${componentName} not found in ${path}`,
+                );
               }
             } catch (error) {
               console.error(`Error importing ${path}:`, error);
               imports[key] = null; // Fallback: Set imports[key] to null
+            }
+          }
+        }
+      } else if (
+        typeof imports[key] === "object" &&
+        imports[key] !== null &&
+        imports[key].path &&
+        imports[key].componentName
+      ) {
+        // Handle serialized Import format: { path: "import::/path", componentName: "Card" }
+        if (imports[key].path.startsWith(IMPORT_PREFIX)) {
+          let path = imports[key].path.replace(IMPORT_PREFIX, "");
+
+          // Sanitize the path before importing
+          path = this.#sanitizePath(path);
+          if (!path) {
+            imports[key] = null;
+            continue;
+          }
+
+          const componentName = imports[key].componentName;
+
+          // Check if the component is already imported
+          if (this.#importCache[path]) {
+            imports[key] =
+              this.#importCache[path][componentName] ||
+              this.#importCache[path].default;
+          } else {
+            try {
+              // Dynamically import the component
+              const module = await import(path);
+
+              // Cache the imported module
+              this.#importCache[path] = module;
+
+              // Check for named export or default export
+              const component = module[componentName] || module.default;
+
+              if (component) {
+                imports[key] = component;
+              } else {
+                console.error(
+                  `Component ${componentName} not found in ${path}`,
+                );
+              }
+            } catch (error) {
+              console.error(`Error importing ${path}:`, error);
+              imports[key] = null;
             }
           }
         }
@@ -2424,14 +2489,32 @@ class MateriaJS {
         if (Array.isArray(imports)) {
           imports = imports.map((value) => {
             if (value && value[IMPORT_MARKER] === true) {
-              return value.path;
+              // Preserve both path and componentName for resolution
+              const componentRef = value.component;
+              const componentName =
+                typeof componentRef === "function"
+                  ? componentRef.name
+                  : componentRef;
+              return {
+                path: value.path,
+                componentName: componentName,
+              };
             }
             return value;
           });
         } else {
           // Single import - keep as single value
-          imports =
-            imports && imports[IMPORT_MARKER] === true ? imports.path : imports;
+          if (imports && imports[IMPORT_MARKER] === true) {
+            const componentRef = imports.component;
+            const componentName =
+              typeof componentRef === "function"
+                ? componentRef.name
+                : componentRef;
+            imports = {
+              path: imports.path,
+              componentName: componentName,
+            };
+          }
         }
       }
     }
