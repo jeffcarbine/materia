@@ -1,8 +1,10 @@
 import {
   validAttributes,
+  validDOMProperties,
   validEvents,
   validMutations,
   validMateriaProps,
+  validV2MateriaProps,
 } from "materiajs/attributes";
 
 const validProps = [
@@ -65,6 +67,9 @@ export class Element {
     for (let key in params) {
       if (
         validProps.includes(key) ||
+        validDOMProperties.includes(key) ||
+        validV2MateriaProps.includes(key) ||
+        this.isV2EventKey(key) ||
         key.startsWith("data-") ||
         key.startsWith("attributes:") ||
         key.startsWith("keydown:")
@@ -72,6 +77,13 @@ export class Element {
         this[key] = params[key];
       }
     }
+  }
+
+  isV2EventKey(key) {
+    if (!key.startsWith("__")) return false;
+
+    const eventName = key.slice(2);
+    return validEvents.includes(eventName) || eventName.startsWith("keydown:");
   }
 
   handlePrimitiveParams(params) {
