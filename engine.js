@@ -70,6 +70,11 @@ export default async (app, appProps) => {
   app.get("/materiajs/attributes", (req, res) => {
     res.sendFile(path.join(__dirname, "attributes.js"));
   });
+  // TODO(v3): Keep both routes through the slow rollout; consolidate only
+  // after client imports no longer depend on the legacy attributes route.
+  app.get("/materiajs/validProps", (req, res) => {
+    res.sendFile(path.join(__dirname, "validProps.js"));
+  });
 };
 
 const renderView = async (view, _data, appProps = {}, callback) => {

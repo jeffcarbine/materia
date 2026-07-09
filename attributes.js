@@ -489,6 +489,8 @@ export const validMutations = [
   "subtree",
 ];
 
+// TODO(v3): Keep these legacy Materia props for v1 compatibility during
+// the v2 rollout; remove v1-only keys after the deprecation window.
 export const validMateriaProps = [
   "if",
   "child",
@@ -501,3 +503,33 @@ export const validMateriaProps = [
   "pipe",
   "preventDefault",
 ];
+
+// TODO(v3): Decide whether `validAttributes` remains the legacy alias or
+// `validHTMLAttributes` becomes the only public name after migration.
+export const validHTMLAttributes = validAttributes;
+
+export const stringDOMProperties = [
+  "$tagName",
+  "$textContent",
+  "$innerHTML",
+  "$contentEditable",
+];
+
+export const booleanDOMProperties = [];
+
+export const numberDOMProperties = [];
+
+export const objectDOMProperties = ["$style", "$dataset"];
+
+export const arrayDOMProperties = ["$classList", "$children"];
+
+export const validDOMProperties = [
+  ...stringDOMProperties,
+  ...booleanDOMProperties,
+  ...numberDOMProperties,
+  ...objectDOMProperties,
+  ...arrayDOMProperties,
+];
+
+// TODO(v2): Wire these v2 internal props into render/bind handling in Phase 3.
+export const validV2MateriaProps = ["$_binding", "$_imports"];
