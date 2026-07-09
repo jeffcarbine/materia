@@ -1,25 +1,18 @@
 import {
   validAttributes,
+  validDOMProperties,
   validEvents,
-  validMutations,
-  validMateriaProps,
+  validV2MateriaProps,
 } from "materiajs/attributes";
 
-const validProps = [
-  ...validAttributes,
-  ...validEvents,
-  ...validMutations,
-  ...validMateriaProps,
-];
-
+// TODO(v3): Collapse this marked v2 element surface into the canonical
+// elements export after the v1 element/render path is retired.
 export class Element {
+  isV2Element = true;
+
   initialize(params = {}) {
-    if (typeof params === "object") {
-      if (Array.isArray(params)) {
-        this.handleArrayParams(params);
-      } else if (params instanceof Element) {
-        this.child = params;
-      } else {
+    if (typeof params === "object" && params !== null) {
+      if (!Array.isArray(params) && !(params instanceof Element)) {
         this.handleObjectParams(params);
       }
     } else {
@@ -64,14 +57,23 @@ export class Element {
   handleObjectParams(params) {
     for (let key in params) {
       if (
-        validProps.includes(key) ||
+        validAttributes.includes(key) ||
+        validDOMProperties.includes(key) ||
+        validV2MateriaProps.includes(key) ||
+        this.isV2EventKey(key) ||
         key.startsWith("data-") ||
-        key.startsWith("attributes:") ||
-        key.startsWith("keydown:")
+        /^data[A-Z]/.test(key)
       ) {
         this[key] = params[key];
       }
     }
+  }
+
+  isV2EventKey(key) {
+    if (!key.startsWith("__")) return false;
+
+    const eventName = key.slice(2);
+    return validEvents.includes(eventName) || eventName.startsWith("keydown:");
   }
 
   handlePrimitiveParams(params) {
@@ -79,7 +81,7 @@ export class Element {
       img: (params) => (this.src = params),
       script: (params) => (this.src = params),
       link: (params) => (this.href = params),
-      default: (params) => (this.textContent = params),
+      default: (params) => (this.$textContent = params),
     };
 
     (primitiveHandlers[this.tagName] || primitiveHandlers.default)(params);

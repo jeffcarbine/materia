@@ -7,6 +7,7 @@
     ".": "./materia.js",
     "./engine": "./engine.js",
     "./elements": "./elements.html.js",
+    "./v2/elements": "./elements-v2.html.js",
     "./attributes": "./attributes.js",
     "./validProps": "./validProps.js"
   },

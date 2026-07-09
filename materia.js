@@ -1,5 +1,6 @@
 // Import all the elements
 import * as elements from "materiajs/elements";
+import * as elements_v2 from "materiajs/v2/elements";
 import {
   validAttributes,
   validEvents,
@@ -28,6 +29,48 @@ if (isServer) {
     });
 } else {
   document = window.document;
+}
+
+const IMPORT_MARKER = Symbol.for("materiaImport");
+const BIND_MARKER = Symbol.for("materiaBind");
+
+export { BIND_MARKER };
+
+export function Import(component, path) {
+  return {
+    [IMPORT_MARKER]: true,
+    component,
+    path,
+  };
+}
+
+// parameters are flexible, so you don't have to pass null parameters if one or more are not needed.
+// passing just the first defaults to the simplest handler case
+export function Bind(binding, importsOrHandler, handler) {
+  if (importsOrHandler === undefined && handler === undefined) {
+    return {
+      [BIND_MARKER]: true,
+      binding,
+      imports: null,
+      handler: ({ data }) => data,
+    };
+  }
+
+  if (typeof importsOrHandler === "function") {
+    return {
+      [BIND_MARKER]: true,
+      binding,
+      imports: null,
+      handler: importsOrHandler,
+    };
+  }
+
+  return {
+    [BIND_MARKER]: true,
+    binding,
+    imports: importsOrHandler,
+    handler,
+  };
 }
 
 /**
@@ -700,6 +743,53 @@ class MateriaJS {
     }
   }
 
+  #setElementAttribute_v2(element, key, value, depth = 0) {
+    if (!element || value === null) return;
+
+    value = this.#v2ProcessBindableValue(element, key, value, depth);
+
+    if (key === "$textContent") {
+      this.#setTextContent(element, value);
+    } else if (key === "$innerHTML") {
+      this.#setInnerHTML(element, value);
+    } else if (key === "$children") {
+      this.#setChildren(element, "children", value, depth);
+    } else if (key === "$style") {
+      this.#setStyle(element, value);
+    } else if (key === "$dataset" && typeof value === "object") {
+      Object.assign(element.dataset, value);
+    } else if (key === "$classList" && Array.isArray(value)) {
+      element.className = "";
+      const classes = value
+        .filter((className) => className && typeof className === "string")
+        .flatMap((className) => className.split(/\s+/))
+        .filter(Boolean);
+      if (classes.length > 0) {
+        element.classList.add(...classes);
+      }
+    } else if (key.startsWith("$")) {
+      element[key.slice(1)] = value;
+    } else if (validAttributes.includes(key) || this.#isDataAttribute_v2(key)) {
+      this.#setAttribute(element, this.#attributeName_v2(key), value);
+    }
+  }
+
+  #isDataAttribute_v2(key) {
+    return key.startsWith("data-") || /^data[A-Z]/.test(key);
+  }
+
+  #attributeName_v2(key) {
+    if (!/^data[A-Z]/.test(key)) return key;
+
+    return (
+      "data-" +
+      key
+        .slice(4)
+        .replace(/^[A-Z]/, (match) => match.toLowerCase())
+        .replace(/[A-Z]/g, (match) => "-" + match.toLowerCase())
+    );
+  }
+
   /**
    * Sets an attribute on an element.
    * @param {Element} element - The element to set the attribute on.
@@ -1028,6 +1118,11 @@ class MateriaJS {
    * @param {Object} handler - The handler to process.
    */
   async #handle(binding, handler) {
+    if (handler.v2 === true) {
+      await this.#handle_v2(binding, handler);
+      return;
+    }
+
     let { element, func, property, pipe, bindings } = handler;
 
     let value;
@@ -1082,6 +1177,49 @@ class MateriaJS {
     }
 
     this.#setElementAttribute(element, property, value);
+  }
+
+  async #handle_v2(binding, handler) {
+    let { element, func, property, pipe, bindings, collectionTemplate } =
+      handler;
+
+    if (typeof func === "string") {
+      func = this.#parseStringifiedFunction(func);
+      handler.func = func;
+    }
+
+    const data = this.#v2GetBindingData(binding, bindings);
+    const imports = await this.#v2ResolveStoredImports(pipe);
+
+    const value = collectionTemplate
+      ? this.#v2EvaluateBindableCollection(collectionTemplate)
+      : func({
+          data,
+          imports,
+          elements: elements_v2,
+          core: { Bind, Import },
+        });
+
+    if (typeof element === "string") {
+      const query = "[data-handler-id='" + element + "']";
+      element = document.querySelector(query);
+      handler.element = element ? element.dataset.handlerId : null;
+    }
+
+    if (element instanceof Element) {
+      if (!document.body.contains(element) && element.tagName !== "HTML") {
+        const handlers = this.#handlers[binding];
+        if (handlers) {
+          const index = handlers.indexOf(handler);
+          if (index > -1) {
+            handlers.splice(index, 1);
+          }
+        }
+        return;
+      }
+    }
+
+    this.#setElementAttribute_v2(element, property, value);
   }
 
   /**
@@ -1592,6 +1730,7 @@ class MateriaJS {
     }
 
     // Check if the template has an "if" property and if it's falsy, return null
+    // TODO(v3): remove the if property
     if (template.hasOwnProperty("if") && !template.if) {
       return null;
     }
@@ -1599,6 +1738,12 @@ class MateriaJS {
     // If the template is a string, return a text node
     if (typeof template === "string") {
       return document.createTextNode(template);
+    }
+
+    // TODO(v3): Make the v2 render path the default after v1 render
+    // compatibility is no longer required.
+    if (template.isV2Element === true) {
+      return this.#render_v2(template, callbackOrQuery, depth);
     }
 
     // Create the element
@@ -1688,6 +1833,78 @@ class MateriaJS {
         return element;
       }
     }
+  }
+
+  #render_v2(template, callbackOrQuery, depth = 0) {
+    if (!template) {
+      return null;
+    }
+
+    if (template.hasOwnProperty("if") && !template.if) {
+      return null;
+    }
+
+    if (typeof template === "string") {
+      return document.createTextNode(template);
+    }
+
+    const tagName = template.$tagName || template.tagName || "div";
+    const element = document.createElementNS(
+      this.#getNamespace(tagName),
+      tagName
+    );
+
+    Object.keys(template).forEach((key) => {
+      let value = template[key];
+
+      if (
+        key === "isV2Element" ||
+        key === "tagName" ||
+        key === "$tagName" ||
+        key === "$_binding" ||
+        key === "$_imports"
+      ) {
+        return;
+      }
+
+      if (this.#isEventKey_v2(key)) {
+        if (!element.dataset.delegateId) {
+          element.dataset.delegateId = this.#generateUniqueId();
+        }
+
+        this.#addEventDelegate(element, key.slice(2), value, {}, true);
+        return;
+      }
+
+      if (this.#isStringifiedFunction(value)) {
+        value = this.#parseStringifiedFunction(value);
+      }
+
+      this.#setElementAttribute_v2(element, key, value, depth);
+    });
+
+    if (isServer && depth === 0) {
+      return this.#handleServerSideRendering(element);
+    } else {
+      if (callbackOrQuery) {
+        if (typeof callbackOrQuery === "function") {
+          callbackOrQuery(element);
+        } else {
+          document.querySelector(callbackOrQuery).appendChild(element);
+        }
+      } else {
+        return element;
+      }
+    }
+  }
+
+  #isEventKey_v2(key) {
+    if (!key.startsWith("__")) return false;
+
+    const eventName = key.slice(2);
+    return (
+      this.#eventTypes.includes(eventName) || eventName.startsWith("keydown:")
+    );
   }
 
   /**
@@ -1919,6 +2136,214 @@ class MateriaJS {
     if (result !== null) {
       this.#setElementAttribute(element, property, result, depth);
     }
+  }
+
+  #v2ProcessBindableValue(element, property, value, depth) {
+    if (this.#isBind(value)) {
+      this.#v2RegisterBind(element, property, value, depth);
+      return this.#v2EvaluateBind(value);
+    }
+
+    if (this.#v2ContainsBind(value)) {
+      this.#v2RegisterCollectionBinds(element, property, value, value, depth);
+      return this.#v2EvaluateBindableCollection(value);
+    }
+
+    return value;
+  }
+
+  #isBind(value) {
+    return value && value[BIND_MARKER] === true;
+  }
+
+  #v2ContainsBind(value) {
+    if (!value || typeof value !== "object") return false;
+    if (this.#isBind(value)) return true;
+
+    return Object.values(value).some((item) => this.#v2ContainsBind(item));
+  }
+
+  #v2EvaluateBindableCollection(value) {
+    if (this.#isBind(value)) {
+      return this.#v2EvaluateBind(value);
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.#v2EvaluateBindableCollection(item));
+    }
+
+    if (value && typeof value === "object") {
+      const processed = {};
+      for (const key in value) {
+        processed[key] = this.#v2EvaluateBindableCollection(value[key]);
+      }
+      return processed;
+    }
+
+    return value;
+  }
+
+  #v2RegisterCollectionBinds(element, property, value, collectionTemplate, depth) {
+    if (this.#isBind(value)) {
+      this.#v2RegisterBind(element, property, value, depth, {
+        collectionTemplate,
+      });
+      return;
+    }
+
+    if (!value || typeof value !== "object") return;
+
+    Object.values(value).forEach((item) => {
+      this.#v2RegisterCollectionBinds(
+        element,
+        property,
+        item,
+        collectionTemplate,
+        depth
+      );
+    });
+  }
+
+  #v2EvaluateBind(bindConfig) {
+    const data = this.#v2GetBindingData(bindConfig.binding, bindConfig.binding);
+    const imports = this.#v2ResolveRuntimeImports(bindConfig.imports);
+
+    return bindConfig.handler({
+      data,
+      imports,
+      elements: elements_v2,
+      core: { Bind, Import },
+    });
+  }
+
+  #v2GetBindingData(binding, bindings) {
+    const bindingsArray = Array.isArray(bindings) ? bindings : [binding];
+
+    if (bindingsArray.length > 1) {
+      return bindingsArray.map((singleBinding) => this.get(singleBinding));
+    }
+
+    return this.get(bindingsArray[0]);
+  }
+
+  #v2RegisterBind(element, property, bindConfig, depth, options = {}) {
+    let handlerElementId;
+
+    if (!element.dataset.handlerId) {
+      handlerElementId = this.#generateUniqueId();
+      element.setAttribute(DATA_HANDLER_ID, handlerElementId);
+    } else {
+      handlerElementId = element.dataset.handlerId;
+    }
+
+    const bindingsArray = Array.isArray(bindConfig.binding)
+      ? bindConfig.binding
+      : [bindConfig.binding];
+
+    bindingsArray.forEach((singleBinding) => {
+      if (!this.#handlers[singleBinding]) {
+        this.#handlers[singleBinding] = [];
+      }
+
+      this.#handlers[singleBinding].push({
+        v2: true,
+        element: handlerElementId,
+        func: isServer ? bindConfig.handler.toString() : bindConfig.handler,
+        property,
+        pipe: isServer
+          ? this.#v2SerializeImports(bindConfig.imports)
+          : bindConfig.imports,
+        bindings: bindingsArray,
+        depth,
+        collectionTemplate: options.collectionTemplate,
+      });
+    });
+
+    let handlerIds = this.#elementHandlerMap.get(element);
+    if (!handlerIds) {
+      handlerIds = new Set();
+      this.#elementHandlerMap.set(element, handlerIds);
+    }
+    handlerIds.add(handlerElementId);
+  }
+
+  #v2ResolveRuntimeImports(imports) {
+    if (!imports) return imports;
+
+    if (Array.isArray(imports)) {
+      return imports.map((item) => this.#v2ResolveRuntimeImports(item));
+    }
+
+    if (imports && imports[IMPORT_MARKER] === true) {
+      return imports.component;
+    }
+
+    if (typeof imports === "object") {
+      const processed = {};
+      for (const key in imports) {
+        processed[key] = this.#v2ResolveRuntimeImports(imports[key]);
+      }
+      return processed;
+    }
+
+    return imports;
+  }
+
+  #v2SerializeImports(imports) {
+    if (!imports) return imports;
+
+    if (Array.isArray(imports)) {
+      return imports.map((item) => this.#v2SerializeImports(item));
+    }
+
+    if (imports && imports[IMPORT_MARKER] === true) {
+      return {
+        path: imports.path,
+        componentName:
+          typeof imports.component === "function"
+            ? imports.component.name
+            : imports.component,
+      };
+    }
+
+    if (typeof imports === "object") {
+      const processed = {};
+      for (const key in imports) {
+        processed[key] = this.#v2SerializeImports(imports[key]);
+      }
+      return processed;
+    }
+
+    return imports;
+  }
+
+  async #v2ResolveStoredImports(imports) {
+    if (!imports) return imports;
+
+    if (Array.isArray(imports)) {
+      return Promise.all(
+        imports.map((item) => this.#v2ResolveStoredImports(item))
+      );
+    }
+
+    if (imports && imports[IMPORT_MARKER] === true) {
+      return imports.component;
+    }
+
+    if (imports && imports.path) {
+      const module = await import(imports.path);
+      return module[imports.componentName] || module.default;
+    }
+
+    if (typeof imports === "object") {
+      const processed = {};
+      for (const key in imports) {
+        processed[key] = await this.#v2ResolveStoredImports(imports[key]);
+      }
+      return processed;
+    }
+
+    return imports;
   }
 
   /**
@@ -2228,6 +2653,7 @@ const DATA_VCLASS = "data-vclass";
 const DATA_VCLASS_OBSERVED = "data-vclass-observed";
 const DEFAULT_IMPORT_MAP = {
   imports: {
+    materiajs: "/materia.js",
     "materiajs/": "/materiajs/",
     "@jeffcarbine/premmio/": "/node_modules/@jeffcarbine/premmio/",
   },
