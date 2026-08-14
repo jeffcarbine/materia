@@ -1930,7 +1930,14 @@ class MateriaJS {
       .replace(/\\/g, "\\\\")
       .replace(/"/g, '\\"')
       .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\r");
+      .replace(/\r/g, "\\r")
+      // Break up "</script" and "<!--" sequences so embedded data can never
+      // cause the HTML parser to end the hydration <script> tag early or
+      // enter script-data-escaped state. The inserted backslash is a valid
+      // (no-op) JS string escape, so JSON.parse still reconstructs the
+      // original characters at runtime.
+      .replace(/<\/script/gi, "<\\/script")
+      .replace(/<!--/g, "<\\!--");
   }
 
   /**
