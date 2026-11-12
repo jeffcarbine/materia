@@ -723,6 +723,10 @@ class MateriaJS {
    * @returns {void}
    */
   #setElementAttribute(element, key, value, depth = 0) {
+    // TODO(v3): Legacy v1 setter for unprefixed `textContent`, `innerHTML`,
+    // `child`, `children`, `prepend`, and `append`; v2 uses
+    // `#setElementAttribute_v2` with `$` properties and `$children` only.
+
     // there is no element in the DOM to set this value to
     if (!element) return;
 
@@ -1762,6 +1766,7 @@ class MateriaJS {
     const pipe = isServer ? template.pipe : this.#encodePipe(template.pipe);
 
     // Pull out the preventDefault value if there is one
+    // TODO(v3): Deprecate the legacy `preventDefault` prop with the v1 render path.
     const preventDefaults = template.preventDefault
       ? Array.isArray(template.preventDefault)
         ? template.preventDefault
@@ -1772,6 +1777,8 @@ class MateriaJS {
     Object.keys(template).forEach((key) => {
       let value = template[key];
 
+      // TODO(v3): Deprecate unprefixed event keys (`click`), `attributes:*`,
+      // and bare `keydown:*`; v2 uses `__`-prefixed events instead.
       if (
         this.#eventTypes.includes(key) ||
         key.startsWith("attributes:") ||
@@ -1792,6 +1799,8 @@ class MateriaJS {
         }
 
         // If the value is a function and the key isn't an event, it's a binding
+        // TODO(v3): Deprecate function values paired with `binding`/`triggers`/
+        // `pipe`; v2 uses explicit `Bind(...)` and `Import(...)` helpers.
         if (typeof value === "function" && !this.#eventTypes.includes(key)) {
           let binding = template.binding;
           let triggers = template.triggers || [];

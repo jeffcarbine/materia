@@ -531,5 +531,6 @@ export const validDOMProperties = [
   ...arrayDOMProperties,
 ];
 
-// TODO(v2): Wire these v2 internal props into render/bind handling in Phase 3.
+// Internal v2 props reserved by the render path; `#render_v2` skips them
+// so they are never written to the DOM.
 export const validV2MateriaProps = ["$_binding", "$_imports"];

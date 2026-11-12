@@ -12,6 +12,9 @@ const validProps = [
   ...validMateriaProps,
 ];
 
+// TODO(v3): This is the legacy v1 element surface. Its array shorthand,
+// `Element`-as-child shorthand, `child`/`children` props, and `attributes:*`/
+// `keydown:*` keys are deprecated in favor of `materiajs/v2/elements`.
 export class Element {
   initialize(params = {}) {
     if (typeof params === "object") {
@@ -27,6 +30,7 @@ export class Element {
     }
   }
 
+  // TODO(v3): Deprecated array shorthand; v2 uses `$children`.
   handleArrayParams(params) {
     const tagHandlers = {
       ul: (item) => (item instanceof Li ? item : new Li(item)),
