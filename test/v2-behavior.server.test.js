@@ -4,7 +4,8 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import MateriaJS, { Bind, Import, BIND_MARKER } from "materiajs";
+import MateriaJS, { Bind, Import, Handle, BIND_MARKER, HANDLE_MARKER } from "materiajs";
+import { greet } from "./fixtures/greeter.js";
 import * as v2 from "materiajs/v2/elements";
 import * as v1 from "materiajs/elements";
 import { waitForServerDocument } from "./helpers.js";
@@ -107,4 +108,50 @@ test("__ events mark the element for event delegation", () => {
   const html = materia.render(new v2.Form({ __submit: () => {} }));
 
   assert.match(html, /<form data-delegate-id="[^"]+"[^>]*><\/form>/);
+});
+
+test("Handle returns a marked helper with optional imports", () => {
+  const handler = ({ target }) => target;
+
+  assert.equal(HANDLE_MARKER, Symbol.for("materiaHandle"));
+  assert.equal(Handle(handler)[HANDLE_MARKER], true);
+  assert.equal(Handle(handler).handler, handler);
+  assert.equal(Handle(handler).imports, null);
+  assert.deepEqual(Handle({ n: 1 }, handler).imports, { n: 1 });
+  assert.equal(Handle({ n: 1 }, handler).handler, handler);
+});
+
+/**
+ * Returns the most recently registered delegate for an event.
+ * @param {string} event - The delegate event name.
+ * @returns {Object} The delegate entry.
+ */
+const lastDelegate = (event) => materia.review().delegate[event].at(-1);
+
+test("a server-rendered __ event is stored as a v2 delegate with its handler as a string", () => {
+  materia.render(new v2.Button({ __click: ({ target }) => target }));
+  const delegate = lastDelegate("click");
+
+  assert.equal(delegate.v2, true);
+  assert.equal(typeof delegate.func, "string");
+  assert.equal(delegate.imports, null);
+});
+
+test("Handle imports are serialized into the delegate state, with Import as a path", () => {
+  materia.render(
+    new v2.Button({
+      __click: Handle(
+        { greet: Import(greet, "/fixtures/greeter.js"), prefix: ">" },
+        ({ imports }) => imports.greet(imports.prefix)
+      ),
+    })
+  );
+  const delegate = lastDelegate("click");
+
+  assert.equal(delegate.v2, true);
+  assert.deepEqual(delegate.imports, {
+    greet: { path: "/fixtures/greeter.js", componentName: "greet" },
+    prefix: ">",
+  });
+  assert.equal(JSON.parse(JSON.stringify(delegate)).imports.greet.path, "/fixtures/greeter.js");
 });

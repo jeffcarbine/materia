@@ -33,8 +33,9 @@ if (isServer) {
 
 const IMPORT_MARKER = Symbol.for("materiaImport");
 const BIND_MARKER = Symbol.for("materiaBind");
+const HANDLE_MARKER = Symbol.for("materiaHandle");
 
-export { BIND_MARKER };
+export { BIND_MARKER, HANDLE_MARKER };
 
 export function Import(component, path) {
   return {
@@ -71,6 +72,22 @@ export function Bind(binding, importsOrHandler, handler) {
     imports: importsOrHandler,
     handler,
   };
+}
+
+/**
+ * Wraps a v2 event handler, optionally with imports, the same way `Bind`
+ * wraps a binding handler. A bare function on a `__` event key is treated as
+ * `Handle(fn)`.
+ * @param {*|Function} importsOrHandler - The imports, or the handler when no imports are needed.
+ * @param {Function} [handler] - The handler, called with `{ target, event, imports, elements, core }`.
+ * @returns {Object} A marked handle object.
+ */
+export function Handle(importsOrHandler, handler) {
+  if (handler === undefined && typeof importsOrHandler === "function") {
+    return { [HANDLE_MARKER]: true, imports: null, handler: importsOrHandler };
+  }
+
+  return { [HANDLE_MARKER]: true, imports: importsOrHandler ?? null, handler };
 }
 
 /**
@@ -1201,7 +1218,7 @@ class MateriaJS {
           data,
           imports,
           elements: elements_v2,
-          core: { Bind, Import },
+          core: { Bind, Import, Handle },
         });
 
     if (typeof element === "string") {
@@ -1242,7 +1259,7 @@ class MateriaJS {
    * @param {string} event - The event to add the delegate for
    * @param {Function} func - The function to run when the event is triggered
    */
-  #addEventDelegate(element, event, func, pipe, preventDefault) {
+  #addEventDelegate(element, event, func, pipe, preventDefault, v2Options = null) {
     // first, we need to check what kind of event is being registered
     // -- if it is a load or resize function that are being set to the
     // window, then they need to be handled differently and just get
@@ -1259,12 +1276,21 @@ class MateriaJS {
 
     // if the event is clickOutside, we need to modify the event to click
     // and the target to the document
+    // v2 keeps the element as the target and matches clicks outside it at
+    // dispatch; those clicks belong to other elements, so their default
+    // action is left alone
     if (event === "clickOutside") {
       event = "click";
-      target = "document";
+
+      if (v2Options) {
+        v2Options = { ...v2Options, outside: true };
+        preventDefault = false;
+      } else {
+        target = "document";
+      }
     }
 
-    this.#registerEvent(event, target, pipe, func, preventDefault);
+    this.#registerEvent(event, target, pipe, func, preventDefault, v2Options);
   }
 
   #createEventListener(event) {
@@ -1291,7 +1317,7 @@ class MateriaJS {
    * @param {Function} func - The function to run when the event is triggered
    * @param {boolean} preventDefault - Whether to prevent the default behavior of the event
    */
-  #registerEvent(event, target, pipe, func, preventDefault) {
+  #registerEvent(event, target, pipe, func, preventDefault, v2Options = null) {
     // check to see if the object already has an instance of the event (which, if it does, it means we have already
     // registered an Event Listener for it)
     if (this.#delegate[event] === undefined) {
@@ -1325,6 +1351,22 @@ class MateriaJS {
 
     if (func.name !== undefined) {
       eventData.name = func.name;
+    }
+
+    if (v2Options) {
+      eventData.v2 = true;
+      if (v2Options.outside) eventData.outside = true;
+      eventData.imports = isServer
+        ? this.#v2SerializeImports(v2Options.imports) ?? null
+        : v2Options.imports ?? null;
+
+      // v2 load handlers take the context object, so adapt them to the
+      // positional calls made by the load paths below
+      if (event === "load" && !isServer) {
+        const handler = func;
+        func = (loadTarget, _pipe, _elements, loadEvent) =>
+          this.#v2RunEventHandler(handler, loadTarget, loadEvent, eventData.imports);
+      }
     }
 
     if (event === "load" && !isServer) {
@@ -1420,7 +1462,8 @@ class MateriaJS {
       }
 
       for (const eventObj of eventArr) {
-        let { target, func, pipe, preventDefault } = eventObj;
+        let { target, func, pipe, preventDefault, v2, imports, outside } =
+          eventObj;
 
         // if the target is a string, then we need to get the element
         // and update the delegate
@@ -1444,7 +1487,9 @@ class MateriaJS {
 
         // check whether the element or its direct parent match
         // the key
-        let match = this.#getMatchingTarget(event, target);
+        let match = outside
+          ? this.#v2GetOutsideTarget(event, target)
+          : this.#getMatchingTarget(event, target);
 
         // set the disabled bool
         let disabled = false;
@@ -1461,6 +1506,11 @@ class MateriaJS {
             if (preventDefault) event.preventDefault();
 
             try {
+              if (v2) {
+                await this.#v2RunEventHandler(func, match, event, imports);
+                continue;
+              }
+
               if (pipe) pipe = await this.#resolvePipeImports(pipe);
               func(match, pipe, elements, event);
             } catch (error) {
@@ -1495,6 +1545,11 @@ class MateriaJS {
         if (typeof func === "string") {
           func = this.#parseStringifiedFunction(func);
           delegate.func = func;
+        }
+
+        if (delegate.v2) {
+          this.#v2RunEventHandler(func, target, { type: "load", target }, delegate.imports);
+          return;
         }
 
         func(target, pipe, elements);
@@ -1881,7 +1936,7 @@ class MateriaJS {
           element.dataset.delegateId = this.#generateUniqueId();
         }
 
-        this.#addEventDelegate(element, key.slice(2), value, {}, true);
+        this.#v2AddEventDelegate(element, key.slice(2), value);
         return;
       }
 
@@ -1905,6 +1960,54 @@ class MateriaJS {
         return element;
       }
     }
+  }
+
+  /**
+   * Registers a v2 `__` event. Bare functions are normalized to `Handle(fn)`;
+   * v2 events always prevent the default action.
+   * @param {Element} element - The element the event is registered on.
+   * @param {string} event - The event name, without the `__` prefix.
+   * @param {Function|Object} value - A handler function or `Handle(...)` object.
+   */
+  #v2AddEventDelegate(element, event, value) {
+    const { handler, imports } = this.#isHandle(value) ? value : Handle(value);
+
+    this.#addEventDelegate(element, event, handler, null, true, { imports });
+  }
+
+  /**
+   * Runs a v2 event handler with the v2 context object.
+   * @param {Function} handler - The event handler.
+   * @param {Element|Document} target - The element the event was registered on.
+   * @param {Event|Object} event - The browser event.
+   * @param {*} imports - The stored `Handle` imports.
+   * @returns {Promise<*>} The handler's return value.
+   */
+  async #v2RunEventHandler(handler, target, event, imports) {
+    return handler({
+      target,
+      event,
+      imports: (await this.#v2ResolveStoredImports(imports)) ?? null,
+      elements: elements_v2,
+      core: { Bind, Import, Handle },
+    });
+  }
+
+  /**
+   * Matches a v2 `__clickOutside` delegate: the element itself when the event
+   * started outside it, or false.
+   * @param {Event} event - The browser event.
+   * @param {Element} element - The element the delegate was registered on.
+   * @returns {Element|false} The element, or false when the click was inside it.
+   */
+  #v2GetOutsideTarget(event, element) {
+    if (!element || !element.isConnected) return false;
+
+    return element.contains(event.target) ? false : element;
+  }
+
+  #isHandle(value) {
+    return !!value && value[HANDLE_MARKER] === true;
   }
 
   #isEventKey_v2(key) {
@@ -2177,6 +2280,11 @@ class MateriaJS {
       return this.#v2EvaluateBind(value);
     }
 
+    // Keep Handle objects intact; copying them would drop their Symbol marker
+    if (this.#isHandle(value)) {
+      return value;
+    }
+
     if (Array.isArray(value)) {
       return value.map((item) => this.#v2EvaluateBindableCollection(item));
     }
@@ -2221,7 +2329,7 @@ class MateriaJS {
       data,
       imports,
       elements: elements_v2,
-      core: { Bind, Import },
+      core: { Bind, Import, Handle },
     });
   }
 

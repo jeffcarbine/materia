@@ -43,7 +43,7 @@ In v2, everything Materia does on top of plain HTML is spelled out explicitly:
 
 - **HTML attributes** are written as-is (`id`, `href`, `dataTheme`).
 - **DOM properties** Materia manages start with `$` (`$textContent`, `$children`, `$classList`).
-- **Events** start with `__` (`__click`, `__submit`).
+- **Events** start with `__` (`__click`, `__submit`), and their handlers can be wrapped with the `Handle` helper.
 - **Data binding** uses the `Bind` helper, and **code shared with the browser** uses the `Import` helper.
 
 ## Installation
@@ -55,13 +55,13 @@ npm i materiajs
 ## Import
 
 ```js
-import MateriaJS, { Bind, Import } from "materiajs";
+import MateriaJS, { Bind, Import, Handle } from "materiajs";
 import { Div, H1, P } from "materiajs/v2/elements";
 ```
 
 | Import | Contents |
 |---|---|
-| `materiajs` | The `MateriaJS` class (default export), plus the `Bind` and `Import` helpers |
+| `materiajs` | The `MateriaJS` class (default export), plus the `Bind`, `Import`, and `Handle` helpers |
 | `materiajs/v2/elements` | The v2 element library |
 | `materiajs/engine` | The Express view engine for server-side rendering |
 | `materiajs/elements` | The v1 element library (see [Migrating from v1](#migrating-from-v1)) |
@@ -251,7 +251,7 @@ The handler receives one object:
 | `data` | The bound value (an array of values when binding multiple keys) |
 | `imports` | Whatever was passed as `Bind`'s second argument, with any `Import` helpers resolved to their modules |
 | `elements` | The v2 element library, so handlers can build elements without importing them |
-| `core` | `{ Bind, Import }`, so handlers can create nested bindings |
+| `core` | `{ Bind, Import, Handle }`, so handlers can create nested bindings and event handlers |
 
 Handlers run on the server for the first render and again in the browser whenever the data changes. They must be self-contained: use the handler context instead of variables from the surrounding module, and pass outside values in through `imports`.
 
@@ -380,12 +380,12 @@ These methods are the same in v1 and v2.
 
 ## Events
 
-Event handlers are keys that start with `__` followed by the event name:
+Event handlers are keys that start with `__` followed by the event name. Like `Bind` handlers, they receive a single object to destructure:
 
 ```js
 new Button({
   $textContent: "Save",
-  __click: (target, pipe, elements, event) => {
+  __click: ({ target, event }) => {
     Materia.set("saved", true);
   },
 });
@@ -393,20 +393,59 @@ new Button({
 new Form({
   method: "POST",
   action: "/submit",
-  __submit: (form) => {
+  __submit: ({ target: form }) => {
     console.log(new FormData(form));
   },
 });
 ```
 
-The handler receives the element the event was registered on (`target`) as its first argument and the browser event as its fourth. The middle two arguments are kept for compatibility with v1 event handlers. Event handlers are serialized and run in the browser, so like `Bind` handlers they must be self-contained.
+| Key | Contents |
+|---|---|
+| `target` | The element the event was registered on |
+| `event` | The browser event |
+| `imports` | Whatever was passed to `Handle` as imports, with any `Import` helpers resolved (`null` without `Handle` imports) |
+| `elements` | The v2 element library |
+| `core` | `{ Bind, Import, Handle }` |
+
+### Event Imports with `Handle`
+
+Event handlers are serialized and run in the browser, so like `Bind` handlers they must be self-contained. To give a handler access to a module or an outside value, wrap it with `Handle`. It works like `Bind` without the binding key:
+
+```js
+Handle(handler);           // same as passing handler directly
+Handle(imports, handler);  // passes imports to handler
+```
+
+```js
+import { Bind, Import, Handle } from "materiajs";
+import { formatPrice } from "../utils/format.js";
+
+const currency = "USD";
+
+new Button({
+  $textContent: "Show total",
+  __click: Handle(
+    [Import(formatPrice, "/utils/format.js"), currency],
+    ({ target, imports: [formatPrice, currency] }) => {
+      target.textContent = formatPrice(Materia.get("cart.total"), currency);
+    }
+  ),
+});
+```
+
+As with `Bind`, imports can be a single value, an array, or an object, and each `Import` path must be a URL the browser can load.
+
+### Default Actions
 
 **Materia always prevents the default action of events it handles.** Adding `__click` to a link stops navigation, and adding `__submit` to a form stops it from submitting. Materia assumes that if you have asked it to handle an event, you want to handle it completely. To keep the browser's default behavior, don't attach a Materia handler to that event.
 
-Special events:
+The exception is `__clickOutside`: the clicks it reacts to belong to other elements, so their default actions are left alone.
 
-- `__clickOutside` runs when the user clicks anywhere outside the element.
-- `__keydown:Key` runs when a specific key is pressed, such as `"__keydown:Enter"` or `"__keydown:Escape"`.
+### Special Events
+
+- `__clickOutside` runs when the user clicks anywhere outside the element. `target` is the element itself.
+- `__keydown:Key` runs when a specific key is pressed inside the element, such as `"__keydown:Enter"` or `"__keydown:Escape"`.
+- `__load` runs once the element is in the page.
 
 DOM mutation events (`childList`, `attributes:*`, `characterData`) are not yet part of the v2 syntax; they remain available through the v1 elements.
 
@@ -463,6 +502,8 @@ To migrate a view, switch its element import to `materiajs/v2/elements` and upda
 | `(data, elements, pipe) => ...` | `({ data, elements, imports, core }) => ...` |
 | `click: handler` | `__click: handler` |
 | `"keydown:Enter": handler` | `"__keydown:Enter": handler` |
+| `(target, pipe, elements, event) => ...` | `({ target, event, imports, elements, core }) => ...` |
+| event `pipe: { fn: "/fn.js" }` | `__click: Handle(Import(fn, "/fn.js"), handler)` |
 | `preventDefault: "click"` | Not needed; Materia always prevents the default for events it handles |
 | `if: condition` | Leave the element out of `$children`, or return `[]` from a bound `$children` handler |
 
