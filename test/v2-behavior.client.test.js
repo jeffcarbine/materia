@@ -252,3 +252,183 @@ test("__clickOutside runs only for clicks outside its element, with that element
   assert.deepEqual(calls, [$("#menu")]);
   assert.equal(outside.defaultPrevented, false, "clicks elsewhere keep their default action");
 });
+
+test("a nested Bind updates only its own element, leaving siblings untouched", async () => {
+  materia.set("label", "one");
+  materia.render(
+    new v2.Div({
+      id: "form",
+      $children: [
+        new v2.Input({ id: "field" }),
+        new v2.Span({ id: "label", $textContent: Bind("label") }),
+      ],
+    }),
+    "#app"
+  );
+  const field = $("#field");
+  field.value = "typed";
+
+  materia.set("label", "two");
+  await flush();
+
+  assert.equal($("#label").textContent, "two");
+  assert.equal($("#field"), field);
+  assert.equal($("#field").value, "typed");
+});
+
+test("re-rendering a bound list does not pile up handlers for removed items", async () => {
+  materia.set("rows", ["x"]);
+  materia.render(
+    new v2.Ul({
+      $children: Bind("rows", ({ data, elements: { Li }, core: { Bind } }) =>
+        data.map(() => new Li({ $textContent: Bind("label") }))
+      ),
+    }),
+    "#app"
+  );
+
+  for (let i = 0; i < 5; i++) {
+    materia.set("rows", ["x", `y${i}`]);
+    await flush();
+    materia.set("label", `l${i}`);
+    await flush();
+  }
+
+  const live = document.querySelectorAll("[data-handler-id]").length;
+  const labelHandlers = materia.review().handlers.label.length;
+  assert.ok(labelHandlers <= live, `${labelHandlers} label handlers for ${live} live bound elements`);
+});
+
+test("a Bind on several keys updates when any of them changes", async () => {
+  materia.set("first", "Ada");
+  materia.set("last", "Lovelace");
+  materia.render(
+    new v2.P({ id: "full", $textContent: Bind(["first", "last"], ({ data: [first, last] }) => `${first} ${last}`) }),
+    "#app"
+  );
+
+  materia.set("last", "Byron");
+  await flush();
+
+  assert.equal($("#full").textContent, "Ada Byron");
+});
+
+test("Bind imports given as an object or array resolve in the browser", async () => {
+  const { greet } = await import("./fixtures/greeter.js");
+  materia.render(
+    new v2.P({
+      id: "imported",
+      $textContent: Bind("name", { greet: Import(greet, "/fixtures/greeter.js"), marks: ["!", "?"] }, ({ data, imports }) => imports.greet(data) + imports.marks.join("")),
+    }),
+    "#app"
+  );
+
+  assert.match($("#imported").textContent, /^Hello, .+!\?$/);
+});
+
+test("a handler whose element was removed is dropped on its next update", async () => {
+  materia.set("cells", ["a"]);
+  materia.set("cellLabel", "x");
+  materia.render(
+    new v2.Ul({
+      $children: Bind("cells", ({ data, elements: { Li, Span }, core: { Bind } }) =>
+        data.map(() => new Li({ $children: [new Span({ $textContent: Bind("cellLabel") })] }))
+      ),
+    }),
+    "#app"
+  );
+
+  materia.set("cells", ["a", "b"]);
+  await flush();
+  materia.set("cellLabel", "y");
+  await flush();
+
+  const live = [...document.querySelectorAll("span[data-handler-id]")].filter((span) => span.textContent === "y");
+  assert.equal(materia.review().handlers.cellLabel.length, live.length);
+});
+
+test("text that looks like code is rendered as plain text", () => {
+  const p = materia.render(new v2.P({ $textContent: "class notes start at 9", title: "() => soon" }));
+
+  assert.equal(p.textContent, "class notes start at 9");
+  assert.equal(p.getAttribute("title"), "() => soon");
+});
+
+test("a listed $ property without special handling sets the DOM property", () => {
+  const div = materia.render(new v2.Div({ $contentEditable: "true" }));
+
+  assert.equal(div.contentEditable, "true");
+});
+
+test("a Bind item in $children that returns several elements adds them all", async () => {
+  materia.set("tags", ["x", "y"]);
+  materia.render(
+    new v2.P({
+      id: "tags",
+      $children: ["Tags: ", Bind("tags", ({ data, elements: { Span } }) => data.map((tag) => new Span(tag)))],
+    }),
+    "#app"
+  );
+
+  assert.equal($("#tags").textContent, "Tags: xy");
+
+  materia.push("tags", "z");
+  await flush();
+
+  assert.equal($("#tags").textContent, "Tags: xyz");
+});
+
+test("a bound element that was never added to the page drops its handler on update", async () => {
+  materia.set("detached", "a");
+  materia.render(new v2.P({ $textContent: Bind("detached") }));
+  assert.equal(materia.review().handlers.detached.length, 1);
+
+  materia.set("detached", "b");
+  await flush();
+
+  assert.equal(materia.review().handlers.detached.length, 0);
+});
+
+test("__clickOutside ignores clicks once its element is removed", async () => {
+  let calls = 0;
+  materia.render(new v2.Div({ id: "gone", __clickOutside: () => calls++ }), "#app");
+  $("#gone").remove();
+
+  document.body.click();
+  await flush();
+
+  assert.equal(calls, 0);
+});
+
+test("an Import falls back to the module's default export", async () => {
+  const button = document.createElement("button");
+  button.dataset.delegateId = "default-import";
+  $("#app").appendChild(button);
+
+  const hydrated = new MateriaJS({
+    data: {},
+    handlers: {},
+    triggers: {},
+    delegate: {
+      click: [
+        {
+          target: "default-import",
+          func: "({ target, imports: greet }) => { target.textContent = greet('Hedy'); }",
+          pipe: null,
+          preventDefault: true,
+          v2: true,
+          imports: {
+            path: new URL("./fixtures/default-greeter.js", import.meta.url).href,
+            componentName: "missing",
+          },
+        },
+      ],
+    },
+  });
+
+  button.click();
+  await flush();
+  hydrated.destroy(button);
+
+  assert.equal(button.textContent, "Hi, Hedy");
+});

@@ -765,7 +765,7 @@ class MateriaJS {
   }
 
   #setElementAttribute_v2(element, key, value, depth = 0) {
-    if (!element || value === null) return;
+    if (value === null) return;
 
     value = this.#v2ProcessBindableValue(element, key, value, depth);
 
@@ -774,6 +774,11 @@ class MateriaJS {
     } else if (key === "$innerHTML") {
       this.#setInnerHTML(element, value);
     } else if (key === "$children") {
+      // `#setChildren` only clears when element children exist, so clear
+      // text-only content here to avoid appending on every update
+      if (element.hasChildNodes() && element.children.length === 0) {
+        this.#clearChildren(element);
+      }
       this.#setChildren(element, "children", value, depth);
     } else if (key === "$style") {
       this.#setStyle(element, value);
@@ -996,7 +1001,9 @@ class MateriaJS {
     // Iterate through handlers and add pipes to the unimported list
     for (const binding in this.#handlers) {
       this.#handlers[binding].forEach((handler) => {
-        if (handler.pipe) {
+        // v2 handlers keep their imports in `pipe` in a different shape and
+        // resolve them on demand (`#v2ResolveStoredImports`), so skip them
+        if (handler.pipe && !handler.v2) {
           this.addUnimportedPipe(handler.pipe);
         }
       });
@@ -1212,8 +1219,14 @@ class MateriaJS {
     const data = this.#v2GetBindingData(binding, bindings);
     const imports = await this.#v2ResolveStoredImports(pipe);
 
+    if (collectionTemplate && handler.templateSerialized) {
+      collectionTemplate = await this.#v2ReviveTemplate(collectionTemplate);
+      handler.collectionTemplate = collectionTemplate;
+      handler.templateSerialized = false;
+    }
+
     const value = collectionTemplate
-      ? this.#v2EvaluateBindableCollection(collectionTemplate)
+      ? this.#v2EvaluateCollectionTemplate(property, collectionTemplate)
       : func({
           data,
           imports,
@@ -1224,20 +1237,18 @@ class MateriaJS {
     if (typeof element === "string") {
       const query = "[data-handler-id='" + element + "']";
       element = document.querySelector(query);
-      handler.element = element ? element.dataset.handlerId : null;
     }
 
-    if (element instanceof Element) {
-      if (!document.body.contains(element) && element.tagName !== "HTML") {
-        const handlers = this.#handlers[binding];
-        if (handlers) {
-          const index = handlers.indexOf(handler);
-          if (index > -1) {
-            handlers.splice(index, 1);
-          }
-        }
-        return;
-      }
+    // The element was removed (e.g. its list re-rendered); drop the handler
+    // so re-renders don't accumulate stale ones
+    if (
+      !(element instanceof Element) ||
+      (!document.body.contains(element) && element.tagName !== "HTML")
+    ) {
+      this.#handlers[binding] = (this.#handlers[binding] || []).filter(
+        (existing) => existing !== handler
+      );
+      return;
     }
 
     this.#setElementAttribute_v2(element, property, value);
@@ -1899,19 +1910,8 @@ class MateriaJS {
     }
   }
 
+  // `render()` handles empty, `if`, and string templates before dispatching here
   #render_v2(template, callbackOrQuery, depth = 0) {
-    if (!template) {
-      return null;
-    }
-
-    if (template.hasOwnProperty("if") && !template.if) {
-      return null;
-    }
-
-    if (typeof template === "string") {
-      return document.createTextNode(template);
-    }
-
     const tagName = template.$tagName || template.tagName || "div";
     const element = document.createElementNS(
       this.#getNamespace(tagName),
@@ -1940,10 +1940,8 @@ class MateriaJS {
         return;
       }
 
-      if (this.#isStringifiedFunction(value)) {
-        value = this.#parseStringifiedFunction(value);
-      }
-
+      // v2 values are never stringified functions (events and Bind/Handle
+      // carry their own markers), so strings are always rendered as text
       this.#setElementAttribute_v2(element, key, value, depth);
     });
 
@@ -2256,6 +2254,23 @@ class MateriaJS {
       return this.#v2EvaluateBind(value);
     }
 
+    // Static `$children` render one by one, so each child registers its own
+    // Binds on its own element. Only Binds that are direct items of the array
+    // re-render this element's children.
+    if (property === "$children" && Array.isArray(value)) {
+      const directBinds = value.filter((item) => this.#isBind(item));
+
+      directBinds.forEach((bindConfig) =>
+        this.#v2RegisterBind(element, property, bindConfig, depth, {
+          collectionTemplate: value,
+        })
+      );
+
+      return directBinds.length > 0
+        ? this.#v2EvaluateChildrenTemplate(value)
+        : value;
+    }
+
     if (this.#v2ContainsBind(value)) {
       this.#v2RegisterCollectionBinds(element, property, value, value, depth);
       return this.#v2EvaluateBindableCollection(value);
@@ -2268,6 +2283,107 @@ class MateriaJS {
     return value && value[BIND_MARKER] === true;
   }
 
+  /**
+   * Evaluates the direct Bind items of a `$children` array, leaving child
+   * elements untouched so they register their own Binds when rendered.
+   * @param {Array} template - The `$children` array.
+   * @returns {Array} The children, with direct Bind results flattened in.
+   */
+  #v2EvaluateChildrenTemplate(template) {
+    return template.flatMap((item) => {
+      if (!this.#isBind(item)) return [item];
+
+      const result = this.#v2EvaluateBind(item);
+      return Array.isArray(result) ? result : [result];
+    });
+  }
+
+  /**
+   * Re-evaluates a stored collection template for a binding update.
+   * @param {string} property - The property the template belongs to.
+   * @param {*} template - The stored template.
+   * @returns {*} The evaluated value.
+   */
+  #v2EvaluateCollectionTemplate(property, template) {
+    return property === "$children"
+      ? this.#v2EvaluateChildrenTemplate(template)
+      : this.#v2EvaluateBindableCollection(template);
+  }
+
+  /**
+   * Serializes a v2 template for the page handed to the browser, keeping Bind
+   * and Handle helpers revivable (JSON would drop their Symbol markers and
+   * functions).
+   * @param {*} value - The template value.
+   * @returns {*} A JSON-safe template.
+   */
+  #v2SerializeTemplate(value) {
+    // functions are only valid as `__` event handlers in v2 templates, so a
+    // bare function is serialized as `Handle(fn)`
+    if (typeof value === "function") return this.#v2SerializeTemplate(Handle(value));
+    if (!value || typeof value !== "object") return value;
+
+    if (this.#isBind(value)) {
+      return {
+        __materiaBind: true,
+        binding: value.binding,
+        imports: this.#v2SerializeImports(value.imports) ?? null,
+        handler: this.#stringifyFunction(value.handler),
+      };
+    }
+
+    if (this.#isHandle(value)) {
+      return {
+        __materiaHandle: true,
+        imports: this.#v2SerializeImports(value.imports) ?? null,
+        handler: this.#stringifyFunction(value.handler),
+      };
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.#v2SerializeTemplate(item));
+    }
+
+    const processed = {};
+    for (const key in value) {
+      processed[key] = this.#v2SerializeTemplate(value[key]);
+    }
+    return processed;
+  }
+
+  /**
+   * Revives a template serialized by `#v2SerializeTemplate`, loading any
+   * imports its Binds use.
+   * @param {*} value - The serialized template.
+   * @returns {Promise<*>} The template with live Bind and Handle helpers.
+   */
+  async #v2ReviveTemplate(value) {
+    if (!value || typeof value !== "object") return value;
+
+    if (value.__materiaBind === true) {
+      const imports = await this.#v2ResolveStoredImports(value.imports);
+      return Bind(
+        value.binding,
+        imports ?? null,
+        this.#parseStringifiedFunction(value.handler)
+      );
+    }
+
+    if (value.__materiaHandle === true) {
+      return Handle(value.imports, this.#parseStringifiedFunction(value.handler));
+    }
+
+    if (Array.isArray(value)) {
+      return Promise.all(value.map((item) => this.#v2ReviveTemplate(item)));
+    }
+
+    const processed = {};
+    for (const key in value) {
+      processed[key] = await this.#v2ReviveTemplate(value[key]);
+    }
+    return processed;
+  }
+
   #v2ContainsBind(value) {
     if (!value || typeof value !== "object") return false;
     if (this.#isBind(value)) return true;
@@ -2278,11 +2394,6 @@ class MateriaJS {
   #v2EvaluateBindableCollection(value) {
     if (this.#isBind(value)) {
       return this.#v2EvaluateBind(value);
-    }
-
-    // Keep Handle objects intact; copying them would drop their Symbol marker
-    if (this.#isHandle(value)) {
-      return value;
     }
 
     if (Array.isArray(value)) {
@@ -2372,7 +2483,11 @@ class MateriaJS {
           : bindConfig.imports,
         bindings: bindingsArray,
         depth,
-        collectionTemplate: options.collectionTemplate,
+        collectionTemplate:
+          isServer && options.collectionTemplate !== undefined
+            ? this.#v2SerializeTemplate(options.collectionTemplate)
+            : options.collectionTemplate,
+        templateSerialized: isServer && options.collectionTemplate !== undefined,
       });
     });
 

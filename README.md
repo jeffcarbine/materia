@@ -108,8 +108,10 @@ Keys that start with `$` set DOM properties instead of HTML attributes:
 | `$classList` | array of strings | The element's classes |
 | `$style` | object | Inline styles, with camelCase property names |
 | `$dataset` | object | Data attributes, with camelCase keys |
+| `$contentEditable` | string | The element's `contentEditable` property |
+| `$tagName` | string | Overrides the element's tag |
 
-Any other `$` key sets the matching DOM property, so `$contentEditable` sets `element.contentEditable`.
+Other `$` keys are ignored.
 
 Use either `$classList` or the plain `class` attribute on an element, not both: whichever is applied last replaces the other's classes.
 
@@ -135,6 +137,8 @@ new Main({
   ],
 });
 ```
+
+In `Ul` and `Ol`, plain text items are wrapped in `Li` elements for you, so `new Ul({ $children: ["a", "b"] })` renders two list items.
 
 `$children` is the only way to add children in v2. The v1 shorthands (passing an array straight to the constructor, `child`, `children`, or passing a `Bind` as the whole argument) are ignored by v2 elements.
 
@@ -310,13 +314,20 @@ new Ul({
 });
 ```
 
-A `Bind` inside a static `$children` array also stays live:
+A `Bind` anywhere inside a static `$children` array stays live and updates only its own element, so the elements around it (and anything typed into them) are left alone. A `Bind` can also be one of the items itself:
 
 ```js
 new Div({
-  $children: [new Span({ $textContent: Bind("user.name") })],
+  $children: [
+    new Input({ name: "nickname" }),
+    new Span({ $textContent: Bind("user.name") }), // only this span updates
+  ],
 });
+
+new P({ $children: ["Signed in as ", Bind("user.name")] });
 ```
+
+This works the same whether the page was rendered in the browser or on the server.
 
 ## Importing with `Import`
 

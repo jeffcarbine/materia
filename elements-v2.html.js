@@ -20,40 +20,6 @@ export class Element {
     }
   }
 
-  handleArrayParams(params) {
-    const tagHandlers = {
-      ul: (item) => (item instanceof Li ? item : new Li(item)),
-      ol: (item) => (item instanceof Li ? item : new Li(item)),
-      dl: (item) => (item instanceof Dt ? item : new Dt(item)),
-      select: (item) => (item instanceof Option ? item : new Option(item)),
-      thead: (params) =>
-        new Tr(
-          params.map((cell) => (cell instanceof Th ? cell : new Th(cell)))
-        ),
-      tbody: (params) =>
-        params.map(
-          (row) =>
-            new Tr(
-              row.map((cell, index) =>
-                index === 0
-                  ? cell instanceof Th
-                    ? cell
-                    : new Th(cell)
-                  : cell instanceof Td
-                  ? cell
-                  : new Td(cell)
-              )
-            )
-        ),
-    };
-
-    if (tagHandlers[this.tagName]) {
-      this.children = params.map(tagHandlers[this.tagName]);
-    } else {
-      this.children = params;
-    }
-  }
-
   handleObjectParams(params) {
     for (let key in params) {
       if (
@@ -257,46 +223,33 @@ export class H6 extends Element {
   }
 }
 
+/**
+ * A heading group. `h` (1-6) with `$textContent` builds the heading, and
+ * `preheading`/`subheading` add paragraphs before and after it; any
+ * `$children` follow them.
+ */
 export class Hgroup extends Element {
   constructor(params) {
     super(params);
     this.tagName = "hgroup";
 
-    if (!this.children) {
-      this.children = [];
-    }
+    if (params && typeof params === "object" && !Array.isArray(params)) {
+      const { h, preheading, subheading, ...rest } = params;
+      const children = [];
 
-    if (params.h) {
-      const heading = new Element();
-      heading.tagName = `h${params.h}`;
-      heading.initialize({
-        textContent: params.textContent,
-      });
+      if (preheading) children.push(new P({ $textContent: preheading }));
 
-      this.children.push(heading);
+      if (h) {
+        const heading = new Element();
+        heading.tagName = `h${h}`;
+        heading.initialize({ $textContent: rest.$textContent });
+        children.push(heading);
+        delete rest.$textContent;
+      }
 
-      delete params.h;
-      delete params.textContent;
-    }
+      if (subheading) children.push(new P({ $textContent: subheading }));
 
-    if (params.subheading) {
-      this.children.push(
-        new P({
-          textContent: params.subheading,
-        })
-      );
-
-      delete params.subheading;
-    }
-
-    if (params.preheading) {
-      this.children.unshift(
-        new P({
-          textContent: params.preheading,
-        })
-      );
-
-      delete params.preheading;
+      params = { ...rest, $children: [...children, ...(rest.$children || [])] };
     }
 
     this.initialize(params);
@@ -415,15 +368,17 @@ export class Pre extends Element {
   }
 }
 
+/**
+ * Base for `Ul` and `Ol`: plain text items in a static `$children` array are
+ * wrapped in `Li` elements.
+ */
 export class ListElement extends Element {
   constructor(params) {
     super(params);
 
-    // if we have params.children
-    if (params.children && Array.isArray(params.children)) {
-      // ensure that they are all wrapped in Li elements
-      params.children = params.children.map((child) =>
-        child instanceof Li ? child : new Li(child)
+    if (params && Array.isArray(params.$children)) {
+      params.$children = params.$children.map((child) =>
+        typeof child === "string" || typeof child === "number" ? new Li(child) : child
       );
     }
   }
@@ -461,7 +416,7 @@ export class A extends Element {
     this.tagName = "a";
 
     // if the href is an external link, then add the noopener and noreferrer attributes
-    if (params.href && params.href.startsWith("http")) {
+    if (params?.href && params.href.startsWith("http")) {
       if (!params.rel) {
         params.rel = "noopener noreferrer";
       } else if (!params.rel.includes("noopener noreferrer")) {
@@ -962,7 +917,7 @@ export class Form extends Element {
       params = {};
     }
 
-    if (!params?.method) {
+    if (typeof params === "object" && !params.method) {
       params.method = "POST";
     }
 

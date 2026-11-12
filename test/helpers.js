@@ -30,13 +30,13 @@ export async function waitForServerDocument(materia) {
 /**
  * Installs a jsdom window as the browser globals `materia.js` expects.
  * Must run before `materia.js` is imported so it takes the client path.
+ * @param {string} [html] - The page to load; defaults to an empty page with `#app`.
  * @returns {JSDOM} The installed jsdom instance.
  */
-export function installClientDom() {
-  const dom = new JSDOM(
-    `<!DOCTYPE html><html><head></head><body><main id="app"></main></body></html>`,
-    { url: "http://localhost/" }
-  );
+export function installClientDom(
+  html = `<!DOCTYPE html><html><head></head><body><main id="app"></main></body></html>`
+) {
+  const dom = new JSDOM(html, { url: "http://localhost/" });
   const { window } = dom;
 
   // jsdom does not implement IntersectionObserver; a no-op stand-in is enough

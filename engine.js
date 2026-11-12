@@ -83,7 +83,16 @@ export default async (app, appProps) => {
 const renderView = async (view, _data, appProps = {}, callback) => {
   const Materia = new MateriaJS();
 
-  const viewProps = view.data || view.props || {};
+  let viewProps = view.data || view.props || {};
+
+  // check before merging: spreading a non-object (e.g. a string) would
+  // silently turn its characters into data keys
+  if (typeof viewProps !== "object") {
+    console.error(
+      `Error in data: Expected an object, but got ${typeof viewProps}.`
+    );
+    viewProps = {};
+  }
 
   const props = { ...viewProps, ...appProps };
 
@@ -95,24 +104,14 @@ const renderView = async (view, _data, appProps = {}, callback) => {
   // and add all of the viewProps to the _data under the materia key
   _data.materia = {};
 
-  if (props) {
-    if (typeof props === "object") {
-      for (const key in props) {
-        const propsData =
-          typeof props[key] === "function"
-            ? await props[key](_data)
-            : props[key];
+  for (const key in props) {
+    const propsData =
+      typeof props[key] === "function" ? await props[key](_data) : props[key];
 
-        await handledata(Materia, key, propsData);
+    await handledata(Materia, key, propsData);
 
-        // and then set the data on the _data.materia object as well
-        _data.materia[key] = propsData;
-      }
-    } else {
-      console.error(
-        `Error in data: Expected an object, but got ${typeof config}.`
-      );
-    }
+    // and then set the data on the _data.materia object as well
+    _data.materia[key] = propsData;
   }
 
   const html = Materia.render(view.default(_data));

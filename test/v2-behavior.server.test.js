@@ -155,3 +155,96 @@ test("Handle imports are serialized into the delegate state, with Import as a pa
   });
   assert.equal(JSON.parse(JSON.stringify(delegate)).imports.greet.path, "/fixtures/greeter.js");
 });
+
+test("every v2 element class constructs with no arguments, an object, or a string", () => {
+  const failures = [];
+  for (const [name, ElementClass] of Object.entries(v2)) {
+    for (const args of [[], [{}], ["text"]]) {
+      try {
+        const element = new ElementClass(...args);
+        assert.equal(element.isV2Element, true);
+      } catch (error) {
+        failures.push(`${name}(${JSON.stringify(args).slice(1, -1)}): ${error.message}`);
+      }
+    }
+  }
+
+  assert.deepEqual(failures, []);
+});
+
+test("a string argument sets src on Img and Script, href on Link, and text elsewhere", () => {
+  assert.equal(new v2.Img("a.png").src, "a.png");
+  assert.equal(new v2.Script("a.js").src, "a.js");
+  assert.equal(new v2.Link("a.css").href, "a.css");
+  assert.equal(new v2.P("hi").$textContent, "hi");
+});
+
+test("the classList.add helper appends classes without duplicates", () => {
+  const div = new v2.Div({});
+  div.classList.add("a");
+  div.classList.add("b");
+  div.classList.add("a");
+
+  assert.equal(div.class, "a b");
+});
+
+test("external links get noopener and noreferrer added to rel", () => {
+  assert.equal(new v2.A({ href: "https://example.com" }).rel, "noopener noreferrer");
+  assert.equal(new v2.A({ href: "https://example.com", rel: "me" }).rel, "me noopener noreferrer");
+  assert.equal(new v2.A({ href: "/local" }).rel, undefined);
+});
+
+test("Hgroup builds its heading and subheadings as v2 children", () => {
+  const html = materia.render(
+    new v2.Hgroup({ h: 2, $textContent: "Title", preheading: "Pre", subheading: "Sub" })
+  );
+
+  assert.equal(html, "<!DOCTYPE html><hgroup><p>Pre</p><h2>Title</h2><p>Sub</p></hgroup>");
+});
+
+test("Ul and Ol wrap plain text $children items in Li elements", () => {
+  assert.equal(
+    materia.render(new v2.Ul({ $children: ["a", new v2.Li("b")] })),
+    "<!DOCTYPE html><ul><li>a</li><li>b</li></ul>"
+  );
+  assert.equal(materia.render(new v2.Ol({ $children: [1] })), "<!DOCTYPE html><ol><li>1</li></ol>");
+});
+
+test("$innerHTML sets raw HTML", () => {
+  assert.equal(
+    materia.render(new v2.Div({ $innerHTML: "<b>x</b>" })),
+    "<!DOCTYPE html><div><b>x</b></div>"
+  );
+});
+
+test("v2 elements drop $ keys that are not listed DOM properties", () => {
+  assert.equal("$hidden" in new v2.Div({ $hidden: true }), false);
+});
+
+test("Bind imports can be arrays and plain values, resolved for server render", () => {
+  const html = materia.render(
+    new v2.P({
+      $textContent: Bind("name", [Import(greet, "/fixtures/greeter.js"), "!"], ({ data, imports: [greet, mark] }) => greet(data) + mark),
+    })
+  );
+
+  assert.match(html, />Hello, Ada!<\/p>/);
+  const handler = materia.review().handlers.name.at(-1);
+  assert.deepEqual(handler.pipe, [{ path: "/fixtures/greeter.js", componentName: "greet" }, "!"]);
+});
+
+test("Handle accepts null imports with a handler", () => {
+  const handler = () => {};
+
+  assert.equal(Handle(null, handler).imports, null);
+  assert.equal(Handle(null, handler).handler, handler);
+});
+
+test("a null value leaves the property unset", () => {
+  assert.equal(materia.render(new v2.P({ $textContent: null })), "<!DOCTYPE html><p></p>");
+});
+
+test("$tagName overrides the tag, and an element without a tag renders as a div", () => {
+  assert.equal(materia.render(new v2.Div({ $tagName: "section" })), "<!DOCTYPE html><section></section>");
+  assert.equal(materia.render(new v2.Element({})), "<!DOCTYPE html><div></div>");
+});
