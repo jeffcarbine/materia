@@ -5,34 +5,32 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
 ![npm](https://img.shields.io/npm/v/materiajs)
 ![license](https://img.shields.io/npm/l/materiajs)
 
+> **Materia v2 is rolling out gradually.** This README documents the v2 syntax. The v1 syntax still works unchanged, and its documentation lives in [`v1/README.md`](v1/README.md). See [Migrating from v1](#migrating-from-v1) for how the two relate.
+
 ## Table of Contents
 
 - [Description](#description)
-- [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Import](#import)
 - [Elements](#elements)
-  - [Properties](#properties)
-  - [Property Exceptions](#property-exceptions)
-  - [Specialized Elements](#specialized-elements)
-  - [Property Shorthands](#property-shorthands)
+  - [Attributes](#attributes)
+  - [`$` Properties](#-properties)
+  - [Children](#children)
+  - [Components](#components)
 - [Rendering](#rendering)
   - [Client-side Render](#client-side-render)
   - [Server-side Render](#server-side-render)
-- [Binding](#binding)
-  - [Nested Bindings](#nested-bindings)
-  - [Triggers](#triggers)
-  - [The Pipe](#the-pipe)
-    - [Client-side Pipe](#client-side-pipe)
-    - [Server-side Pipe](#server-side-pipe)
-  - [Managing the Data](#managing-the-data)
-  - [Manipulating the data](#manipulating-the-data)
-  - [Cleaning Up Data and Elements](#cleaning-up-data-and-elements)
-- [Viewport Classes](#viewport-classes)
+- [Binding with `Bind`](#binding-with-bind)
+  - [Handler Context](#handler-context)
+  - [Binding Multiple Keys](#binding-multiple-keys)
+  - [Nested Binds](#nested-binds)
+  - [Bound Children](#bound-children)
+- [Importing with `Import`](#importing-with-import)
+- [Managing the Data](#managing-the-data)
 - [Events](#events)
-  - [Preventing Default](#preventing-default)
-  - [Special Event Types](#special-event-types)
+- [Viewport Classes](#viewport-classes)
 - [Debugging](#debugging)
+- [Migrating from v1](#migrating-from-v1)
 - [Contributing](#contributing)
 - [License](#license)
 - [Contact](#contact)
@@ -41,13 +39,14 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
 
 Materia is a lightweight JavaScript framework designed for rendering both server-side and client-side HTML. It includes a library of all valid HTML elements, including SVG elements, and provides a simple API for binding and rendering.
 
-## Prerequisites
+In v2, everything Materia does on top of plain HTML is spelled out explicitly:
 
-- Node.js (version 12 or higher)
+- **HTML attributes** are written as-is (`id`, `href`, `dataTheme`).
+- **DOM properties** Materia manages start with `$` (`$textContent`, `$children`, `$classList`).
+- **Events** start with `__` (`__click`, `__submit`).
+- **Data binding** uses the `Bind` helper, and **code shared with the browser** uses the `Import` helper.
 
 ## Installation
-
-You can install the package via npm:
 
 ```sh
 npm i materiajs
@@ -55,873 +54,430 @@ npm i materiajs
 
 ## Import
 
-To use Materia directly, import it into your project.
-
 ```js
-import MateriaJS from "materiajs";
+import MateriaJS, { Bind, Import } from "materiajs";
+import { Div, H1, P } from "materiajs/v2/elements";
 ```
 
-If you wish to use server-side rendering, import the engine into your project
-
-```js
-import engine from "materiajs/engine";
-import express from "express";
-
-const app = express();
-engine(app);
-```
+| Import | Contents |
+|---|---|
+| `materiajs` | The `MateriaJS` class (default export), plus the `Bind` and `Import` helpers |
+| `materiajs/v2/elements` | The v2 element library |
+| `materiajs/engine` | The Express view engine for server-side rendering |
+| `materiajs/elements` | The v1 element library (see [Migrating from v1](#migrating-from-v1)) |
 
 ## Elements
 
-Materia includes a library of all 161 valid HTML elements, including SVG elements. You can import any of these elements from the included `elements` file.
+Every HTML and SVG element is available as a class from `materiajs/v2/elements`. Pass a single object of attributes, `$` properties, and `__` events:
 
 ```js
-import { Div, H1, Img, P } from "materiajs/elements";
+import { A } from "materiajs/v2/elements";
 
-const element = new Div({
-  class: "card",
-  children: [
-    new H1("Hello World"),
-    new Img("image.webp"),
-    new P("This is an example card"),
+const link = new A({
+  href: "/about",
+  $classList: ["nav-link"],
+  $textContent: "About",
+});
+```
+
+As a shorthand, a string sets the text of most elements, the `src` of `Img` and `Script`, and the `href` of `Link`:
+
+```js
+new P("Hello");
+new Img("/images/logo.png");
+```
+
+### Attributes
+
+Any valid HTML attribute is written by its name. Data attributes can be written in camelCase (`dataTheme` renders as `data-theme`) or with a hyphen (`"data-theme"`):
+
+```js
+new Body({ dataTheme: "dark" });
+// <body data-theme="dark"></body>
+```
+
+### `$` Properties
+
+Keys that start with `$` set DOM properties instead of HTML attributes:
+
+| Property | Value | Effect |
+|---|---|---|
+| `$textContent` | string | The element's text |
+| `$innerHTML` | string | The element's raw HTML |
+| `$children` | array | The element's child elements and text (see [Children](#children)) |
+| `$classList` | array of strings | The element's classes |
+| `$style` | object | Inline styles, with camelCase property names |
+| `$dataset` | object | Data attributes, with camelCase keys |
+
+Any other `$` key sets the matching DOM property, so `$contentEditable` sets `element.contentEditable`.
+
+Use either `$classList` or the plain `class` attribute on an element, not both: whichever is applied last replaces the other's classes.
+
+```js
+new Section({
+  $classList: ["welcome-section", "padding-m"],
+  $style: { marginBottom: "2rem" },
+  $dataset: { userId: "42" },
+});
+// <section class="welcome-section padding-m" style="margin-bottom:2rem;" data-user-id="42"></section>
+```
+
+### Children
+
+Children are always passed through `$children`, as an array of elements and strings:
+
+```js
+new Main({
+  $children: [
+    new H1({ $textContent: "Welcome" }),
+    new P("Thanks for stopping by."),
+    "Plain text works too.",
   ],
 });
 ```
 
-### Properties
+`$children` is the only way to add children in v2. The v1 shorthands (passing an array straight to the constructor, `child`, `children`, or passing a `Bind` as the whole argument) are ignored by v2 elements.
 
-Properties of an element in Materia are the same as an Element in JavaScript, with a few exceptions listed below.
+### Components
 
-```js
-const element = document.querySelector("#element");
-element.id = "foo";
-element.tagName = "div";
-element.textContent = "Hello World";
-element.tabindex = -1;
-
-const alsoElement = new Div({
-  id: "foo",
-  textContent: "Hello World",
-  tabindex: -1,
-});
-
-// both create <div id="foo" tabindex="-1">Hello World</div>
-```
-
-### Property Exceptions
-
-There are a few exceptions to this rule:
-
-- `children` accepts an array of objects to render as the element's children
-- `child` accepts a single object to render as the element's sole child
-- `class` in lieu of className, for simplicity - however `className` does still work
-- `if` conditionally renders an element
-- `binding` the key to bind the attribute to
+A component is a class that extends a v2 element and adjusts its props:
 
 ```js
-const showElement = false;
+// components/card.html.js
+import { Div } from "materiajs/v2/elements";
 
-const element = new Div({
-  children: [
-    new Div({
-      child: new P({
-        textContent: "This always shows",
-      }),
-    }),
-    new Div({
-      if: showElement,
-      child: new P({
-        class: "conditional",
-        textContent: "This only renders if showElement is true",
-      }),
-    }),
-  ],
-});
+export class Card extends Div {
+  constructor(props = {}) {
+    props.$classList = ["card", ...(props.$classList || [])];
+    super(props);
+  }
+}
 ```
-
-### Specialized Elements
-
-Materia also includes a number of specialized elements to simplify the process:
-
-- `Stylesheet` extends `Link` - adds `rel="stylesheet"` automatically
-- `PreLoadStyle` extends `Link` - adds `rel`, `as`, and `onload` to pre-load stylesheets
-- `Module` extends `Script` - adds `type="module`
-- `HiddenInput`, `TextInput`, `SearchInput`, `TelInput`, `UrlInput`, `EmailInput`, `PasswordInput`, `DateInput`, `MonthInput`, `WeekInput`, `TimeInput`, `DateTimeLocalInput`, `NumberInput`, `RangeInput`, `ColorInput`, `CheckboxInput`, `RadioInput`, `ResetInput` all extend `Input` and add their appropriate `type`
-- `LazyImg` extends `Img` and adds `loading="lazy"`
-
-### Property Shorthands
-
-You can shorthand properties in an element by passing a single value into it, in the even that element only needs a certain single value
-
-- Arrays will shorthand `children`
-- Objects will shorthand `child`
-- Strings will generally shorthand `textContent`
-- Functions will shorthand data binds (more on that later)
-
-```js
-const element = new Div([
-  new Div(new P("This always shows")),
-  new Div({
-    if: showElement,
-    child: new P({
-      class: "conditional",
-      textContent: "This only renders if showElement is true",
-    }),
-  }),
-]);
-```
-
-Some elments have unique shorthands:
-
-- Img: string shorthand creates the `src` attribute
-- Select: array shorthand wraps each child in an Option(), unless already wrapped
-- Ul & Ol: array shorthand wraps each child in a Li(), unless already wrapped
-- Dl: array shorthand wraps each child in a Dt(), unless already wrapped
-- Thead: array shorthand wraps each child in a Th() unless already wrapped, and wraps the children in a Tr(), unless already wrapped
-- Tbody: array shorthand wraps first child in a Th() and subsequent children in a Td() unless already wrapped, and wraps the children in a Tr(), unless already wrapped
 
 ## Rendering
 
 ### Client-side Render
 
-To client-side render, import `MateriaJS` and call the `render()` method. `render()` takes in three parameters:
-
-- the object to render
-- a callback function or query selector string (optional)
-- the depth of rendering (optional)
+`render` takes an element and either a CSS selector to append it to, or a callback that receives the rendered DOM element:
 
 ```js
-import MateriaJS from "materiajs";
+const materia = new MateriaJS({ data: {}, handlers: {}, triggers: {}, delegate: {} });
 
-const materia = new MateriaJS();
+materia.render(new P("Hello"), "#app");
 
-// renders an element and runs a callback
-materia.render(new H1("Hello World"), (element) =>
-  document.body.appendChild(element)
-);
-
-// renders an element and appends it to "body"
-materia.render(new H1("Hello World"), "body");
+materia.render(new P("Hello"), (element) => {
+  document.body.prepend(element);
+});
 ```
 
-## Server-side Render
+With no second argument, `render` returns the DOM element.
 
-Materia can server-side render your layouts. The filename extension that Materia looks for is `.html.js`.
+### Server-side Render
 
-To server-side render, import the engine
+Materia renders views on the server through an Express view engine. Views are files with the extension `.html.js`:
 
 ```js
-import engine from "materiajs/engine";
+// index.js
 import express from "express";
+import engine from "materiajs/engine";
 
 const app = express();
 engine(app);
-```
-
-And then you can write your views using Materia with the extension of `.html.js`. Materia templates export a default function with a parameter of `data`, which contains the data being sent from the server.
-
-```js
-/// index.html.js
-export default (data) => {
-  return new Html([
-    new Head([new Title(data.title), new Stylesheet("styles/site.css")]),
-    new Body([
-      new Main([
-        new Section({
-          id: "welcome",
-          children: [
-            new H1(`Welcome to ${data.pageName}`),
-            new P(data.pageWelcomeText),
-          ],
-        }),
-      ]),
-    ]),
-  ]);
-};
 
 app.get("/", (req, res) => {
-  res.render("index", {
-    title: "Welcome to my website",
-    pageName: "Home",
-    pageWelcomeText: "Welcome to my website",
-  });
+  res.render("index", { title: "Home" });
 });
+
+app.listen(3000);
 ```
 
-You can easily create a layout template to be shared across your views:
+A view exports a default function that receives the data passed to `res.render` and returns an element tree. A view can also export `props`, the initial data that its `Bind` calls read. This data is serialized into the page so the browser can keep the bindings live:
 
 ```js
-// layout.html.js
-export const layout = (data, content) => {
-  return new Html([
-    new Head([new Title(data.title), new Stylesheet("styles/site.css")]),
-    new Body([new Main(content || {})]),
-  ]);
+// views/index.html.js
+import { Bind } from "materiajs";
+import { Html, Head, Title, Body, Main, H1 } from "materiajs/v2/elements";
+
+export const props = {
+  user: { name: "Ada", theme: "dark" },
 };
-```
 
-```js
-// index.html.js
-import { layout } from "./layout.html.js";
-
-export default (data) => {
-  return layout(data, {
-    id: "welcome",
-    children: [
-      new H1(`Welcome to ${data.pageName}`),
-      new P(data.pageWelcomeText),
+export default (data) =>
+  new Html({
+    $children: [
+      new Head({ $children: [new Title(data.title)] }),
+      new Body({
+        dataTheme: Bind("user.theme"),
+        $children: [
+          new Main({
+            $children: [
+              new H1({
+                $textContent: Bind("user.name", ({ data: name }) => `Welcome, ${name}!`),
+              }),
+            ],
+          }),
+        ],
+      }),
     ],
   });
-};
+```
 
-app.get("/", (req, res) => {
-  res.render("index", {
-    title: "Welcome to my website",
-    pageName: "Home",
-    pageWelcomeText: "Welcome to my website",
-  });
+To set app-wide data, pass it to the engine: `engine(app, { siteName: "My Site" })`. Values in `props` can also be functions; each one receives the `res.render` data, may be `async`, and its result is stored under its key.
+
+## Binding with `Bind`
+
+`Bind` connects a value to a piece of Materia data, called its **binding key**. The value renders from the current data and re-renders whenever that data changes. Binding keys can use dot notation and array indexes (`"user.name"`, `"items[0]"`).
+
+`Bind` can be used as the value of any attribute, `$` property, or item in `$classList`, `$style`, `$dataset`, or `$children`. It takes up to three arguments:
+
+```js
+Bind(binding);                      // renders the bound value as-is
+Bind(binding, handler);             // renders handler's return value
+Bind(binding, imports, handler);    // also passes imports to handler
+```
+
+```js
+new P({ $textContent: Bind("user.name") });
+
+new P({ $textContent: Bind("user.name", ({ data: name }) => `Hi, ${name}`) });
+```
+
+### Handler Context
+
+The handler receives one object:
+
+| Key | Contents |
+|---|---|
+| `data` | The bound value (an array of values when binding multiple keys) |
+| `imports` | Whatever was passed as `Bind`'s second argument, with any `Import` helpers resolved to their modules |
+| `elements` | The v2 element library, so handlers can build elements without importing them |
+| `core` | `{ Bind, Import }`, so handlers can create nested bindings |
+
+Handlers run on the server for the first render and again in the browser whenever the data changes. They must be self-contained: use the handler context instead of variables from the surrounding module, and pass outside values in through `imports`.
+
+### Binding Multiple Keys
+
+Pass an array of binding keys to depend on several values at once. `data` is then an array in the same order:
+
+```js
+new P({
+  $textContent: Bind(["user", "system"], ({ data: [user, system] }) =>
+    `${user.name} is using the ${system.theme} theme`
+  ),
 });
 ```
 
-## Binding
+### Nested Binds
 
-Binding functions are anonymous functions that run anytime a bound piece of data is updated on a MateriaJS instance. The function is bound to the data via a string known as a **binding key**. This can be a single value, or can be dot notation of a larger object.
-
-To bind, set the `binding` property on an element to the desired binding key, then pass an anonymous function to an element's property. The anonymous function can accept up to three parameters:
-
-- The data being bound
-- The `materiajs/elements` library of elements (optional, when you need access to Materia elements)
-- The piped data to the function (optional, when you need access to piped components/functions)
-
-### Server-side binding setup
-
-You can pre-bind values from the server by declaring `props`. The `props` declaration must be an object with unique key/value pairs. The values may be static values, or may be anonymous functions with a parameter of `data`. The `data` parameter is the same as the `data` parameter that is passed to the view.
-
-You can declare app-wide bindings by passing the `props` to the engine, or you can declare view-specific bindings by creating a secondary export of `props` in your view.
+`Bind` can appear inside `$classList`, `$style`, and `$dataset`, next to static values:
 
 ```js
-// App-wide binding
-const props = {
-  someBool: true,
-  username: "John Doe",
-  someData: () => {
-    return Model.find();
-  },
-};
+const isDevelopment = true;
 
-const app = express();
-engine(app, props);
-```
-
-```js
-// View-specific binding
-export const props = {
-  someBool: true,
-  username: "John Doe",
-  someData: () => {
-    return Model.find();
-  },
-};
-```
-
-### Client-side binding setup
-
-To set data for binding on the client-side, you need to add data to a MateriaJS instance using the `.set()` method. The first parameter of the `set()` method is the binding key.
-
-```js
-const materia = new MateriaJS();
-
-materia.set("test", {
-  class: "test-element",
-  text: "This is a test of binding",
-  children: ["one", "two", "three"],
-});
-```
-
-Then, instead of writing static values in your elements, you can define the binding on each element that needs data binding, and then access that data via the anonymous function.
-
-### Nested Bindings
-
-You can bind to specific nested properties within your data objects by using dot notation in your binding keys. This allows for more granular control over which elements update when specific parts of your data change.
-
-**Important notes about nested bindings:**
-
-1. You can bind to any nested property (e.g., `"test.class"`, `"user.profile.name"`, etc.)
-2. Updating a parent binding (e.g., `"test"`) will **not** automatically trigger child bindings (e.g., `"test.class"`)
-3. Child bindings must be updated directly, or you can manually trigger them using `run()` on the parent binding
-
-```js
-const element = new Div({
-  binding: "test.class",
-  class: (class) => class,
-  children: [
-    new P({
-      binding: "test.text",
-      textContent: (text) => text,
-    }),
-    new Div({
-      binding: "test",
-      pipe: {
-        SomeComponent,
-      },
-      children: (test, elements, pipe) => {
-        const { Span } = elements;
-        const { SomeComponent } = pipe;
-
-        return test.children.map((item) => {
-          return new SomeComponent({
-            child: new Span(item),
-          });
-        });
-      },
-    }),
+new Section({
+  $classList: [
+    "welcome-section",
+    Bind("user.theme", isDevelopment, ({ data: theme, imports: isDevelopment }) =>
+      isDevelopment ? `theme-${theme} debug` : `theme-${theme}`
+    ),
   ],
-});
-```
-
-### Triggers
-
-Triggers allow you to make binding handlers re-run when related data changes, even if the main binding itself hasn't changed. This is particularly useful when you want a binding to update based on changes to nested properties within the main binding's data.
-
-When you define triggers on an element, any changes to those trigger bindings will cause the element's main binding handler to re-execute. **Trigger paths are relative to the main binding** - they represent nested properties within the main binding's data structure. The trigger bindings themselves don't pass their data to the handler - the handler still receives data from its main binding.
-
-```js
-const materia = new MateriaJS();
-
-materia.set("user", {
-  profile: {
-    name: "John Doe",
-    email: "john@example.com",
+  $style: {
+    color: Bind("user.theme", ({ data: theme }) => (theme === "dark" ? "red" : "blue")),
+    marginBottom: "2rem",
   },
-  settings: {
-    theme: "dark",
-    language: "en",
+  $dataset: {
+    userTheme: Bind("user.theme"),
   },
 });
-
-const userCard = new Div({
-  binding: "user",
-  triggers: ["profile.name", "settings.theme"], // These are relative to "user"
-  class: (user) => `user-card theme-${user.settings.theme}`,
-  children: (user) => [
-    new H2(user.profile.name),
-    new P(user.profile.email),
-    new Span(`Theme: ${user.settings.theme}`),
-  ],
-});
-
-// This will cause the userCard to re-render because "user.profile.name" matches the trigger "profile.name"
-materia.set("user.profile.name", "Jane Doe");
-
-// This will also cause the userCard to re-render because "user.settings.theme" matches the trigger "settings.theme"
-materia.set("user.settings.theme", "light");
-
-// This will NOT cause the userCard to re-render because "user.profile.email" doesn't match any triggers
-materia.set("user.profile.email", "jane@example.com");
 ```
 
-**Key points about triggers:**
+Only the bound part updates when the data changes; the static classes, styles, and data attributes stay in place.
 
-- Triggers are defined as an array of binding strings in the `triggers` property
-- **Trigger paths are relative to the main binding** (e.g., `binding: "user"` with `triggers: ["profile.name"]` means changes to `"user.profile.name"` will trigger the handler)
-- When any trigger binding changes, the main binding's handler re-executes
-- The handler function still receives data from the main binding, not from the trigger bindings
-- Triggers are useful for making components reactive to nested property changes within the main binding's data
-- You can have multiple triggers on a single element
+### Bound Children
 
-### The Pipe
-
-Since the binding functions are anonymous, they don't inheritly have access to the values defined outside of it. In order to access external data, you need to first pipe it to your element.
-
-#### Client-side Pipe
-
-If you are client-side, you can simply pass the values directly
+A `Bind` on `$children` returns an array of children, which is re-rendered whenever the data changes. Return an empty array to render nothing. Build the children with `elements` from the handler context, and use `core.Bind` to bind values inside them:
 
 ```js
-import { Component } from "./someComponent.html.js";
-
-const element = new Div({
-  binding: "test",
-  pipe: {
-    Component,
-  }
-  class: (test) => test.class,
-  children: [
-    new P((test) => test.text),
-    new Ul({
-      children: (test, elements, pipe) => {
-        const { Component } = pipe;
-        const { Li } = elements;
-
-        const children = [];
-
-        element.children.forEach((child) => {
-          children.push(new Li(child));
-        });
-
-        return children;
-      },
-    }),
-  ],
+new Ul({
+  $children: Bind("todos", ({ data: todos, elements: { Li }, core: { Bind } }) =>
+    todos.map((todo, index) =>
+      new Li({
+        $classList: [Bind(`todos[${index}].done`, ({ data: done }) => (done ? "done" : ""))],
+        $textContent: todo.title,
+      })
+    )
+  ),
 });
 ```
 
-#### Server-side Pipe
-
-If you are server-side, you might need to pass additional data to the pipe.
-
-If the value you are piping is self-contained in the file, you can simply pipe directly to that data. If that data is imported from elsewhere, you will need to pass `data` and `path` values instead.
-
-The data is the reference to the data at time of render, and the path is the path to the file from the client-side so that the data can be imported at the time of re-render.
+A `Bind` inside a static `$children` array also stays live:
 
 ```js
-import { Component } from "./someComponent.html.js";
-
-const camelize = (str) => {
-  // a function that takes a string and turns it into camel case, for example
-}
-
-const element = new Div({
-  binding: "test",
-  pipe: {
-    camelize,
-    Component: {
-      data: Component,
-      path: "/path/to/someComponent.html.js",
-    }
-  }
-  class: (test) => test.class,
-  children: [
-    new P((test) => test.text),
-    new Ul({
-      children: (test, elements, pipe) => {
-        const { Component, camelize } = pipe;
-        const { Li } = elements;
-
-        const children = [];
-
-        test.children.forEach((child) => {
-          children.push(new Li(camelize(child)));
-        });
-
-        return children;
-      },
-    }),
-  ],
+new Div({
+  $children: [new Span({ $textContent: Bind("user.name") })],
 });
 ```
 
-### Managing the Data
+## Importing with `Import`
 
-#### Getting Data
-
-You can retrieve data from a MateriaJS instance using the `get()` method:
+Handlers run in the browser, where they can't see the server's module imports. `Import(module, path)` passes a module to a handler on the server and tells the browser where to load it from:
 
 ```js
-const materia = new MateriaJS();
+import { Bind, Import } from "materiajs";
+import { Card } from "../components/card.html.js";
 
-materia.set("user", {
-  name: "John Doe",
-  settings: {
-    theme: "dark",
-    notifications: true,
-  },
-  friends: ["Alice", "Bob", "Charlie"],
-});
-
-// Get simple values
-const userName = materia.get("user.name"); // "John Doe"
-const theme = materia.get("user.settings.theme"); // "dark"
-
-// Get array values
-const firstFriend = materia.get("user.friends[0]"); // "Alice"
-const allFriends = materia.get("user.friends"); // ["Alice", "Bob", "Charlie"]
-
-// Get entire objects
-const userSettings = materia.get("user.settings"); // {theme: "dark", notifications: true}
-```
-
-#### Manually Running Bindings
-
-You can manually trigger a binding to re-render using the `run()` method:
-
-```js
-// This will cause all elements bound to "user.name" to re-render
-materia.run("user.name");
-
-// This will cause all elements bound to "user" to re-render
-materia.run("user");
-```
-
-### Manipulating the data
-
-Materia has the following methods to manipulate its data:
-
-1. `set(binding, data)`
-2. `push(binding, data)`
-3. `pushMany(binding, data)`
-4. `setInArray(binding, query, data)`
-5. `update(binding, data)`
-6. `pull(binding, data)`
-
-```js
-const materia = new MateriaJS();
-```
-
-`materia.set` allows you to set any value of the data.
-
-```js
-materia.set("test.class", "new-class");
-```
-
-`materia.push` allows you to push to an array value within the data, assuming the value you are trying to push to is an array.
-
-```js
-materia.push("test.children", "four");
-```
-
-`materia.pushMany` allows you to push multiple values to an array at once.
-
-```js
-materia.pushMany("test.children", ["five", "six", "seven"]);
-```
-
-`materia.update` allows you to update multiple properties of an object at once without overwriting the entire object.
-
-```js
-materia.update("test", {
-  class: "updated-class",
-  text: "Updated text",
-});
-// This updates only the specified properties, leaving other properties intact
-```
-
-`materia.setInArray` finds a matching object in an array and updates it, or adds it if not found.
-
-```js
-materia.set("users", [
-  { id: 1, name: "John", active: true },
-  { id: 2, name: "Jane", active: false },
-]);
-
-// Update existing user
-materia.setInArray(
-  "users",
-  { id: 1 },
-  { id: 1, name: "John Doe", active: true }
-);
-
-// Add new user (since id: 3 doesn't exist)
-materia.setInArray("users", { id: 3 }, { id: 3, name: "Bob", active: true });
-```
-
-`materia.pull` removes a matching object from an array.
-
-```js
-// Remove user with id: 2
-materia.pull("users", { id: 2 });
-```
-
-Any element's property bound verbatim to the value being manipulated will have it's value updated.
-
-```js
-materia.set("test", {
-  class: "test-element",
-  text: "This is a test of binding",
-  children: ["one", "two", "three"],
-  name: {
-    first: "John",
-    last: "Doe",
-  }
-});
-
-const element = new Div({
-  binding: "test",
-  pipe: {
-    camelize,
-    Component: {
-      data: Component,
-      path: "/path/to/someComponent.html.js",
-    }
-  }
-  class: (test) => test.class,
-  children: [
-    new P((test) => test.text),
-    new Div({
-      binding: "test.name",
-      children: (name, element) => {
-        const { Span } = element;
-
-        return [new Span(name.first), new Span(name.last)];
-      }
-    }),
-    new Ul({
-      children: (test, elements, pipe) => {
-        const { Component, camelize } = pipe;
-        const { Li } = elements;
-
-        const children = [];
-
-        test.children.forEach((child) => {
-          children.push(new Li(camelize(child)));
-        });
-
-        return children;
-      },
-    }),
-  ],
-});
-
-materia.set("test.name.first", "Joe"); // will not cause the "test.name" binding to update since we are being more specific
-materia.update("test", {
-  class: "new-class"
-}); // will cause the "test" bound elements to update since we are modifying that binding
-```
-
-### Cleaning Up Data and Elements
-
-The `destroy()` method allows you to clean up data, handlers, and DOM elements. It can accept either a binding string or a DOM element.
-
-**Destroying by binding:**
-
-```js
-// Remove data and all associated elements for a binding
-materia.destroy("test.name");
-
-// This will:
-// - Delete the data at "test.name"
-// - Remove any DOM elements bound to "test.name"
-// - Clean up all handlers for "test.name"
-```
-
-**Destroying by element:**
-
-```js
-const element = document.querySelector(".some-element");
-
-// Remove element and clean up all associated handlers and delegates
-materia.destroy(element);
-
-// This will:
-// - Remove the element from the DOM
-// - Clean up all handlers connected to this element
-// - Remove any event delegates connected to this element
-// - Disconnect any IntersectionObservers for this element
-```
-
-The `destroy()` method is useful for:
-
-- Cleaning up when components are no longer needed
-- Preventing memory leaks by removing unused handlers
-- Dynamic content management where elements are frequently added/removed
-
-## Viewport Classes
-
-MateriaJS includes a built-in feature for automatically adding CSS classes when elements enter the viewport. This is useful for animations, lazy loading, or other viewport-based interactions.
-
-### Basic Usage
-
-Add a `data-vclass` attribute to any element with the class name you want to add when it enters the viewport:
-
-```js
-const element = new Div({
-  "data-vclass": "fade-in",
-  textContent: "This will get the 'fade-in' class when visible",
+new Section({
+  $children: Bind(
+    ["user", "system"],
+    [Import(Card, "/components/card.html.js"), isDevelopment],
+    ({ data: [user, system], imports: [Card, isDevelopment], elements: { Div }, core: { Bind } }) =>
+      isDevelopment
+        ? [
+            new Card({ $textContent: `${user.name}, age ${user.age}, theme ${system.theme}` }),
+            new Div({ $textContent: Bind("secret", ({ data }) => `The secret is ${data}!`) }),
+          ]
+        : []
+  ),
 });
 ```
 
-When this element enters the viewport, MateriaJS will automatically add the `fade-in` class to the element's `className`.
-
-### Custom Root Margin
-
-You can control when the class is added by setting a custom root margin using `data-vclass-margin`:
+The path must be a URL the browser can load, so serve the file statically:
 
 ```js
-const element = new Div({
-  "data-vclass": "slide-up",
-  "data-vclass-margin": "50px", // Add class when element is 50px from entering viewport
-  textContent: "Animation triggers 50px early",
-});
+app.use("/components", express.static("components"));
 ```
 
-### CSS Example
+`Bind`'s imports can be a single value, an array, or an object. Plain values (like `isDevelopment` above) are passed through unchanged.
 
-```css
-/* Initial state - elements start invisible/offset */
-[data-vclass="fade-in"] {
-  opacity: 0;
-  transition: opacity 0.5s ease-in-out;
-}
+## Managing the Data
 
-/* Applied when element enters viewport */
-.fade-in {
-  opacity: 1;
-}
+Change data through the `MateriaJS` instance, and the bindings on that key re-render. In the browser, a server-rendered page exposes its instance as `window.Materia`.
 
-/* Initial state - element starts below */
-[data-vclass="slide-up"] {
-  transform: translateY(20px);
-  transition: transform 0.3s ease-out;
-}
+Updates match binding keys exactly. Setting `"user.name"` re-renders `Bind("user.name")` but not `Bind("user")`, and setting `"user"` doesn't re-render `Bind("user.name")`. Bind to the key you change, or call `run("user")` to re-run a key and every key beneath it.
 
-/* Applied when element enters viewport */
-.slide-up {
-  transform: translateY(0);
-}
+| Method | Effect |
+|---|---|
+| `get(binding)` | Returns the value at `binding` (an empty string if it doesn't exist) |
+| `set(binding, value)` | Sets the value at `binding` |
+| `update(binding, object)` | Merges `object` into the object at `binding` |
+| `sum(binding, number)` | Adds `number` to the number at `binding` |
+| `sumUpdate(binding, object)` | Adds each number in `object` to the matching key at `binding` |
+| `push(binding, value)` | Appends `value` to the array at `binding` |
+| `unshift(binding, value)` | Prepends `value` to the array at `binding` |
+| `pushMany(binding, values)` | Appends each of `values` to the array at `binding` |
+| `setInArray(binding, query, value)` | Replaces the first array item matching `query`, or appends `value` if none matches |
+| `pull(binding, query)` | Removes the first array item matching `query` |
+| `run(binding)` | Re-runs the bindings for `binding` and every key beneath it, without changing data |
+| `destroy(bindingOrElement)` | For a key, deletes its data, its bound elements, and its handlers. For an element, removes it and its handlers and event delegates |
+
+```js
+Materia.set("user.name", "Grace");
+Materia.push("todos", { title: "Write docs", done: false });
+Materia.update("user", { theme: "light" });
 ```
 
-This feature uses the Intersection Observer API under the hood and automatically cleans up observers when elements are removed from the DOM.
+These methods are the same in v1 and v2.
 
 ## Events
 
-You can add event delegation to any element by passing an anonymous function to the event key name.
-
-The anonymous function accepts four parameters:
-
-- the target element itself
-- the pipe
-- the elements library
-- the event
+Event handlers are keys that start with `__` followed by the event name:
 
 ```js
-import { CustomComponent } from "./customComponent.html.js";
-
-const button = new Button({
-  class: "submit",
-  pipe: {
-    CustomComponent: {
-      data: CustomComponent,
-      path: "./customComponent.html.js",
-    },
+new Button({
+  $textContent: "Save",
+  __click: (target, pipe, elements, event) => {
+    Materia.set("saved", true);
   },
-  click: (target, pipe, elements, event) => {
-    const { CustomComponent } = pipe;
-    const { Div } = elements;
-    const eventType = event.type;
+});
 
-    // Create a new element using the piped component and elements
-    const newElement = new Div({
-      children: [new CustomComponent({ eventType })],
-    });
-
-    target.appendChild(newElement);
+new Form({
+  method: "POST",
+  action: "/submit",
+  __submit: (form) => {
+    console.log(new FormData(form));
   },
 });
 ```
 
-### Preventing default
+The handler receives the element the event was registered on (`target`) as its first argument and the browser event as its fourth. The middle two arguments are kept for compatibility with v1 event handlers. Event handlers are serialized and run in the browser, so like `Bind` handlers they must be self-contained.
 
-Since Materia handles it's events via delegation, you can't preventDefault inside the anonymous function. By the time the anonymous function has run, the default can no longer be prevented.
+**Materia always prevents the default action of events it handles.** Adding `__click` to a link stops navigation, and adding `__submit` to a form stops it from submitting. Materia assumes that if you have asked it to handle an event, you want to handle it completely. To keep the browser's default behavior, don't attach a Materia handler to that event.
+
+Special events:
+
+- `__clickOutside` runs when the user clicks anywhere outside the element.
+- `__keydown:Key` runs when a specific key is pressed, such as `"__keydown:Enter"` or `"__keydown:Escape"`.
+
+DOM mutation events (`childList`, `attributes:*`, `characterData`) are not yet part of the v2 syntax; they remain available through the v1 elements.
+
+## Viewport Classes
+
+Add a `dataVclass` attribute to add a class to an element when it enters the viewport, which is useful for animations and lazy loading:
 
 ```js
-const form = new Form({
-  submit: (form, pipe, event) {
-    event.preventDefault(); // will not work, default will have already ocurred
-  }
-})
-```
-
-Instead, pass a preventDefault value to the element with either a string or an array of strings of the events you want to prevent default on.
-
-```js
-const form = new Form({
-  preventDefault: "submit",
-  submit: (form, pipe, event) => {
-    // default is now prevented properly
-  },
-});
-
-const form2 = new Form({
-  preventDefault: ["submit", "click"], // multiple defaults to prevent
-  submit: (form, pipe, event) => {
-    // default is now prevented properly
-  },
-  click: (form, pipe, event) => {
-    // default is prevented here too
-  },
-  "keydown:Enter": (form, pipe, event) => {
-    // default is not prevented here
-  },
+new Div({
+  dataVclass: "fade-in",
+  dataVclassMargin: "50px", // optional: add the class 50px before the element is visible
+  $textContent: "This gets the 'fade-in' class when visible",
 });
 ```
 
-### Special Event Types
-
-MateriaJS supports several special event types for enhanced functionality:
-
-**`clickOutside`** - Triggers when clicking anywhere outside the element:
-
-```js
-const modal = new Div({
-  class: "modal",
-  clickOutside: (target, pipe, elements, event) => {
-    // Close modal when clicking outside
-    target.style.display = "none";
-  },
-  children: [
-    /* modal content */
-  ],
-});
+```css
+[data-vclass="fade-in"] { opacity: 0; transition: opacity 0.5s ease-in-out; }
+.fade-in { opacity: 1; }
 ```
-
-**`keydown:` prefix** - Listen for specific key presses:
-
-```js
-const input = new Input({
-  "keydown:Enter": (target, pipe, elements, event) => {
-    // Handle Enter key press
-    console.log("Enter key pressed!");
-  },
-  "keydown:Escape": (target, pipe, elements, event) => {
-    // Handle Escape key press
-    target.blur();
-  },
-});
-```
-
-**Mutation events** - React to DOM changes:
-
-```js
-const container = new Div({
-  childList: (target, pipe, mutation) => {
-    // Triggered when child elements are added or removed
-    console.log("Children changed:", mutation);
-  },
-  "attributes:class": (target, pipe, mutation) => {
-    // Triggered when the class attribute changes
-    console.log("Class attribute changed:", mutation);
-  },
-});
-```
-
-Available mutation events:
-
-- `childList` - Child elements added/removed
-- `attributes` - Any attribute changed
-- `attributes:attributeName` - Specific attribute changed (e.g., `attributes:class`)
-- `characterData` - Text content changed
 
 ## Debugging
 
-### Reviewing Current State
-
-You can inspect the current state of a MateriaJS instance using the `review()` method, which returns an object containing the current data, handlers, triggers, and delegates:
+`review()` returns the current state of a MateriaJS instance:
 
 ```js
-const materia = new MateriaJS();
-
-materia.set("user", { name: "John", age: 30 });
-
-const state = materia.review();
-console.log(state.data); // Shows current data: {user: {name: "John", age: 30}}
-console.log(state.handlers); // Shows current binding handlers
-console.log(state.triggers); // Shows current triggers
-console.log(state.delegate); // Shows current event delegates
+const state = Materia.review();
+console.log(state.data);     // current data
+console.log(state.handlers); // binding handlers
+console.log(state.triggers); // triggers
+console.log(state.delegate); // event delegates
 ```
+
+## Migrating from v1
+
+v2 is being rolled out gradually. Nothing is removed in this release:
+
+- `materiajs/elements` still exports the v1 elements, with all of the v1 syntax documented in [`v1/README.md`](v1/README.md).
+- The `MateriaJS` class renders v1 and v2 elements side by side; each element is handled by the syntax of the library it came from. You can migrate one view or component at a time.
+- The v1 syntax is marked for deprecation in the source and will be removed in a future major version.
+
+To migrate a view, switch its element import to `materiajs/v2/elements` and update its syntax:
+
+| v1 | v2 |
+|---|---|
+| `new Div([a, b])` | `new Div({ $children: [a, b] })` |
+| `children: [a, b]` / `child: a` | `$children: [a, b]` |
+| `textContent: "Hi"` | `$textContent: "Hi"` |
+| `innerHTML: "<b>Hi</b>"` | `$innerHTML: "<b>Hi</b>"` |
+| `class: "a b"` | `$classList: ["a", "b"]` (`class` still works as a plain attribute, but don't combine the two) |
+| `style: { color: "red" }` | `$style: { color: "red" }` |
+| `"data-user-id": 1` | `dataUserId: 1`, or `$dataset: { userId: 1 }` |
+| `binding: "name", textContent: (name) => name` | `$textContent: Bind("name", ({ data: name }) => name)` |
+| `pipe: { Card: "/card.js" }` | `Bind(key, Import(Card, "/card.js"), handler)` |
+| `(data, elements, pipe) => ...` | `({ data, elements, imports, core }) => ...` |
+| `click: handler` | `__click: handler` |
+| `"keydown:Enter": handler` | `"__keydown:Enter": handler` |
+| `preventDefault: "click"` | Not needed; Materia always prevents the default for events it handles |
+| `if: condition` | Leave the element out of `$children`, or return `[]` from a bound `$children` handler |
+
+v2 intentionally has no equivalent for these v1 shorthands:
+
+- passing an array of children directly to the constructor;
+- `child` and `children` (use `$children`);
+- passing a `Bind` as the whole constructor argument (bind `$children` instead);
+- a second constructor argument for children.
+
+Components should accept a single props object and extend v2 elements.
 
 ## Contributing
 
-Contributions are welcome! If you have any ideas, suggestions, or bug reports, please open an issue on GitHub. If you would like to contribute code, you can do so by forking the repository and creating a pull request. Please ensure that your code follows the project's coding standards.
+Contributions are welcome! If you have any ideas, suggestions, or bug reports, please open an issue on GitHub. If you would like to contribute code, you can do so by forking the repository and creating a pull request. Please ensure that your code follows the project's coding standards and that `npm test` passes.
 
 To contribute:
 
