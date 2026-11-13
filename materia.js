@@ -3103,12 +3103,14 @@ class MateriaJS {
     if (!value || typeof value !== "object") return value;
 
     if (value.__materiaBind === true) {
-      const imports = await this.#v2ResolveStoredImports(value.imports);
-      return Bind(
-        value.binding,
-        imports ?? null,
-        this.#parseStringifiedFunction(value.handler)
-      );
+      // build the Bind directly: Bind()'s argument handling would mistake a
+      // single imported class or function for the handler
+      return {
+        [BIND_MARKER]: true,
+        binding: value.binding,
+        imports: (await this.#v2ResolveStoredImports(value.imports)) ?? null,
+        handler: this.#parseStringifiedFunction(value.handler),
+      };
     }
 
     if (value.__materiaHandle === true) {

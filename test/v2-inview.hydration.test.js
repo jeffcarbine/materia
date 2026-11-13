@@ -57,3 +57,40 @@ test("an InView child replaces its initial content on scroll without rebuilding 
   assert.equal($("#kids").textContent, "firstlightlast");
   assert.equal($("#first"), first);
 });
+
+test("a component inside InView renders with its classes, handlers, and bindings after hydration", async () => {
+  assert.equal($("#comp").textContent, "…");
+
+  viewport.enter($("#comp"));
+  await flush();
+
+  const badge = $("#badge");
+  assert.equal(badge.className, "badge");
+  assert.equal(badge.textContent, "light");
+
+  badge.click();
+  await flush();
+  assert.equal(badge.dataset.clicked, "yes");
+
+  materia.set("tone", "blue");
+  await flush();
+  assert.equal($("#badge").textContent, "blue");
+});
+
+test("an InView(Bind) whose handler builds an imported component works after hydration", async () => {
+  assert.equal($("#bound-comp").textContent, "");
+
+  viewport.enter($("#bound-comp"));
+  await flush();
+
+  assert.equal($("#made").className, "badge");
+  assert.equal($("#made").textContent, "made blue");
+
+  materia.set("tone", "green");
+  await flush();
+  assert.equal($("#made").textContent, "made green");
+
+  $("#made").click();
+  await flush();
+  assert.equal($("#made").dataset.clicked, "yes");
+});

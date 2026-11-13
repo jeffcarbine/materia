@@ -28,7 +28,7 @@ A lightweight JavaScript framework for rendering both server-side and client-sid
 - [Importing with `Import`](#importing-with-import)
 - [Managing the Data](#managing-the-data)
 - [Events](#events)
-- [Viewport Classes](#viewport-classes)
+- [Values That Wait Until In View](#values-that-wait-until-in-view)
 - [Debugging](#debugging)
 - [Migrating from v1](#migrating-from-v1)
 - [Contributing](#contributing)
@@ -44,7 +44,7 @@ In v2, everything Materia does on top of plain HTML is spelled out explicitly:
 - **HTML attributes** are written as-is (`id`, `href`, `dataTheme`).
 - **DOM properties** Materia manages start with `$` (`$textContent`, `$children`, `$classList`).
 - **Events** start with `__` (`__click`, `__submit`), and their handlers can be wrapped with the `Handle` helper.
-- **Data binding** uses the `Bind` helper, and **code shared with the browser** uses the `Import` helper.
+- **Data binding** uses the `Bind` helper, **code shared with the browser** uses the `Import` helper, and **values that wait until an element scrolls into view** use the `InView` helper.
 
 ## Installation
 
@@ -55,13 +55,13 @@ npm i materiajs
 ## Import
 
 ```js
-import MateriaJS, { Bind, Import, Handle } from "materiajs";
+import MateriaJS, { Bind, Import, Handle, InView } from "materiajs";
 import { Div, H1, P } from "materiajs/v2/elements";
 ```
 
 | Import | Contents |
 |---|---|
-| `materiajs` | The `MateriaJS` class (default export), plus the `Bind`, `Import`, and `Handle` helpers |
+| `materiajs` | The `MateriaJS` class (default export), plus the `Bind`, `Import`, `Handle`, and `InView` helpers |
 | `materiajs/v2/elements` | The v2 element library |
 | `materiajs/engine` | The Express view engine for server-side rendering |
 | `materiajs/elements` | The v1 element library (see [Migrating from v1](#migrating-from-v1)) |
@@ -259,7 +259,7 @@ The handler receives one object:
 | `data` | The bound value (an array of values when binding multiple keys) |
 | `imports` | Whatever was passed as `Bind`'s second argument, with any `Import` helpers resolved to their modules |
 | `elements` | The v2 element library, so handlers can build elements without importing them |
-| `core` | `{ Bind, Import, Handle }`, so handlers can create nested bindings and event handlers |
+| `core` | `{ Bind, Import, Handle, InView }`, so handlers can create nested bindings, event handlers, and in-view values |
 
 Handlers run on the server for the first render and again in the browser whenever the data changes. They must be self-contained: use the handler context instead of variables from the surrounding module, and pass outside values in through `imports`.
 
@@ -420,7 +420,7 @@ new Form({
 | `event` | The browser event |
 | `imports` | Whatever was passed to `Handle` as imports, with any `Import` helpers resolved (`null` without `Handle` imports) |
 | `elements` | The v2 element library |
-| `core` | `{ Bind, Import, Handle }` |
+| `core` | `{ Bind, Import, Handle, InView }` |
 
 ### Event Imports with `Handle`
 
@@ -464,22 +464,100 @@ The exception is `__clickOutside`: the clicks it reacts to belong to other eleme
 
 DOM mutation events (`childList`, `attributes:*`, `characterData`) are not yet part of the v2 syntax; they remain available through the v1 elements.
 
-## Viewport Classes
+## Values That Wait Until In View
 
-Add a `dataVclass` attribute to add a class to an element when it enters the viewport, which is useful for animations and lazy loading:
+Wrap any value in `InView` to hold it back until its element scrolls into view. It replaces `dataVclass` for revealing classes, and works for any attribute or `$` property:
 
 ```js
-new Div({
-  dataVclass: "fade-in",
-  dataVclassMargin: "50px", // optional: add the class 50px before the element is visible
-  $textContent: "This gets the 'fade-in' class when visible",
+import { InView } from "materiajs";
+
+new Section({
+  $classList: ["card", InView("fade-in")], // "fade-in" is added when the card is in view
+  $children: [new H2("Our work")],
 });
 ```
 
 ```css
-[data-vclass="fade-in"] { opacity: 0; transition: opacity 0.5s ease-in-out; }
-.fade-in { opacity: 1; }
+.card { opacity: 0; transition: opacity 0.5s ease-in-out; }
+.card.fade-in { opacity: 1; }
 ```
+
+`InView` takes the value and an optional options object:
+
+```js
+InView(value);
+InView(value, { initial, margin, threshold, once });
+```
+
+| Option | Default | Effect |
+|---|---|---|
+| `initial` | none | Shown until the element is in view. Without it, nothing is applied until then: the class, style, data attribute, or attribute is left out, and a `$children` item isn't rendered. |
+| `margin` | `"0px"` | How far outside the viewport counts as "in view", in CSS margin syntax (`"200px"` reveals early, `"-50px"` late). |
+| `threshold` | `0.1` | How much of the element must be visible, from `0` to `1`. |
+| `once` | `true` | With `false`, the value goes back to `initial` (or is removed) when the element leaves the viewport, and returns when it comes back. |
+
+`InView` works anywhere a value goes:
+
+```js
+new Div({
+  title: InView("Loaded"),                                  // an attribute
+  $textContent: InView("Ready", { initial: "Loading…" }),   // a $ property
+  $classList: ["card", InView("fade-in", { margin: "200px" })], // one class in a list
+  $style: { opacity: InView("1", { initial: "0", once: false }) }, // one style
+  $dataset: { state: InView("visible", { initial: "hidden" }) },   // one data attribute
+  $children: [
+    new H2("Gallery"),
+    InView(new Gallery({}), { initial: new P("Loading gallery…") }), // render later
+  ],
+});
+```
+
+An `InView` item in `$children` is rendered in place when it's revealed; the elements around it aren't rebuilt.
+
+### Defaults
+
+Set app-wide `margin` and `threshold` defaults on the engine for server-rendered pages, or on the instance for browser-only use. Options on an individual `InView` override them:
+
+```js
+engine(app, appProps, { inView: { margin: "100px", threshold: 0.25 } });
+
+const materia = new MateriaJS({ data: {}, handlers: {}, triggers: {}, delegate: {}, inView: { margin: "100px" } });
+```
+
+### With `Bind`
+
+`InView` and `Bind` combine both ways:
+
+- `InView(Bind(...))` holds the binding back: nothing is bound or shown until the element is in view, and from then on it updates live. While a `once: false` value is out of view, its updates wait until it's shown again.
+- A revealed value stays revealed when its property re-renders, so a bound `$classList` keeps a revealed `InView` class.
+- `InView` is in every handler's `core`, so `Bind` handlers can return `InView` values.
+- A component instance inside `InView` needs nothing extra: it's built on the server and sent to the browser as is. A `Bind` handler inside `InView` that builds components still runs in the browser, so it needs the component through `Import`, like any other `Bind`:
+
+```js
+new Div({
+  $children: [
+    InView(new Gallery({})), // fine as is
+    InView(Bind("photos", Import(Gallery, "/components/gallery.html.js"), ({ data, imports: Gallery }) => new Gallery({ photos: data }))),
+  ],
+});
+```
+
+```js
+new P({
+  $classList: [Bind("theme"), InView("fade-in")], // "fade-in" stays after the theme changes
+  $textContent: InView(Bind("user.name"), { initial: "…" }),
+});
+```
+
+### Server Rendering
+
+Server-rendered pages show each value's `initial` state (or nothing), and the browser picks up the rest on load: values already in view are revealed straight away, and the others as they scroll in. Content rendered later in the browser works the same way.
+
+If the browser doesn't support `IntersectionObserver`, `InView` values are applied immediately. `InView` can't wrap `__` event handlers; Materia logs an error and doesn't register the event.
+
+### `dataVclass`
+
+The v1 `dataVclass` / `dataVclassMargin` attributes still work, but are deprecated for v2: they only apply to elements on the page when Materia starts, and a bound `$classList` update removes the class they added. Use `$classList: [..., InView("fade-in", { margin })]` instead.
 
 ## Debugging
 
@@ -521,6 +599,7 @@ To migrate a view, switch its element import to `materiajs/v2/elements` and upda
 | event `pipe: { fn: "/fn.js" }` | `__click: Handle(Import(fn, "/fn.js"), handler)` |
 | `preventDefault: "click"` | Not needed; Materia always prevents the default for events it handles |
 | `if: condition` | Leave the element out of `$children`, or return `[]` from a bound `$children` handler |
+| `"data-vclass": "fade-in", "data-vclass-margin": "50px"` | `$classList: [InView("fade-in", { margin: "50px" })]` |
 
 v2 intentionally has no equivalent for these v1 shorthands:
 

@@ -74,3 +74,7 @@ test("a Handle inside a re-rendered $children keeps working after hydration", as
   assert.equal($("#say").textContent, "hi");
   assert.equal($("#bare").textContent, "bare");
 });
+
+test("a Bind with a single imported function re-renders after hydration", () => {
+  assert.equal($("#greeting").textContent, "Hello, Grace");
+});

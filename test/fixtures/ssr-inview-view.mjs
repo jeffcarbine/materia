@@ -3,13 +3,16 @@
  * (top-level, inside a bound $classList, and as a $children item) with
  * instance defaults, and prints `{ html, state }` as handed to the browser.
  */
-import MateriaJS, { Bind, InView } from "materiajs";
+import MateriaJS, { Bind, Import, InView } from "materiajs";
 import { Div, P, Span, Em, I } from "materiajs/v2/elements";
+import { Badge } from "./components/badge.js";
 import { waitForServerDocument } from "../helpers.js";
 
 const materia = new MateriaJS({ inView: { margin: "25px" } });
 await waitForServerDocument(materia);
 materia.set("tone", "dark");
+
+const badgePath = new URL("./components/badge.js", import.meta.url).href;
 
 const html = materia.render(
   new Div({
@@ -22,6 +25,26 @@ const html = materia.render(
           new Span({ id: "first", $textContent: "first" }),
           InView(new Em({ id: "late", $textContent: Bind("tone") }), { initial: new I("loading") }),
           new Span({ id: "last", $textContent: "last" }),
+        ],
+      }),
+      // a component instance inside InView
+      new Div({
+        id: "comp",
+        $children: [
+          InView(new Badge({ id: "badge", $children: [new Span({ $textContent: Bind("tone") })] }), {
+            initial: "…",
+          }),
+        ],
+      }),
+      // an InView(Bind) whose handler builds a component through Import
+      new Div({
+        id: "bound-comp",
+        $children: [
+          InView(
+            Bind("tone", Import(Badge, badgePath), ({ data, imports: Badge }) =>
+              new Badge({ id: "made", $textContent: `made ${data}` })
+            )
+          ),
         ],
       }),
     ],

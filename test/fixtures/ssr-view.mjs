@@ -27,6 +27,10 @@ const html = materia.render(
           new Main({
             $children: [
               new H1({ id: "title", $textContent: Bind("user.name", ({ data }) => `Welcome, ${data}`) }),
+              new P({
+                id: "greeting",
+                $children: [Bind("user.name", Import(greet, greeterPath), ({ data, imports: greet }) => greet(data))],
+              }),
               new P({ id: "mixed", $children: ["Signed in as ", Bind("user.name", "!", ({ data, imports: mark }) => data + mark)] }),
               new Section({
                 id: "panel",
