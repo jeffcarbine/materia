@@ -569,6 +569,8 @@ console.log(state.data);     // current data
 console.log(state.handlers); // binding handlers
 console.log(state.triggers); // triggers
 console.log(state.delegate); // event delegates
+console.log(state.inView);   // InView defaults ({ margin, threshold })
+console.log(state.inViewEntries); // InView values a server-rendered page hands to the browser
 ```
 
 ## Migrating from v1
