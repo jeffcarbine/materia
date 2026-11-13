@@ -437,3 +437,54 @@ test("a re-render that changes an InView's margin stops the old observer watchin
 
   assert.deepEqual(viewport.observersFor(div).map((observer) => observer.options.rootMargin), ["30px"]);
 });
+
+// --- Phase 3: hydration edge cases (hand-written server registry) ---
+
+/** A serialized InView as a server-rendered page hands it over. */
+const serialized = (id, value, options = {}) => ({ __materiaInView: true, id, value, options });
+
+test("hydration skips entries whose element or child anchor is no longer on the page", async () => {
+  document.querySelector("#app").insertAdjacentHTML(
+    "beforeend",
+    `<div data-inview-id="kept"><!--something else--><span>x</span></div>`
+  );
+
+  const hydrated = new MateriaJS({
+    data: {},
+    handlers: {},
+    triggers: {},
+    delegate: {},
+    inViewEntries: {
+      gone: [{ kind: "value", property: "$textContent", depth: 0, inView: serialized("g", "never") }],
+      kept: [{ kind: "child", property: "$children", depth: 0, inView: serialized("k", "late"), template: [], anchorId: "missing", nodeCount: 0 }],
+    },
+  });
+  await flush();
+
+  const kept = document.querySelector('[data-inview-id="kept"]');
+  assert.equal(viewport.observersFor(kept).length, 0);
+  assert.equal(kept.textContent, "x");
+  hydrated.destroy(kept);
+});
+
+test("hydration without IntersectionObserver applies InView values immediately", async () => {
+  document.querySelector("#app").insertAdjacentHTML("beforeend", `<p data-inview-id="eager">Waiting</p>`);
+  const stub = globalThis.IntersectionObserver;
+  delete globalThis.IntersectionObserver;
+  try {
+    new MateriaJS({
+      data: {},
+      handlers: {},
+      triggers: {},
+      delegate: {},
+      inViewEntries: {
+        eager: [{ kind: "value", property: "$textContent", depth: 0, inView: serialized("e", "Now", { initial: "Waiting" }) }],
+      },
+    });
+    await flush();
+
+    assert.equal(document.querySelector('[data-inview-id="eager"]').textContent, "Now");
+  } finally {
+    globalThis.IntersectionObserver = stub;
+  }
+});

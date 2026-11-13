@@ -39,17 +39,17 @@ const handledata = async (Materia, key, data) => {
 
 const viewCache = new Map();
 
-export default async (app, appProps) => {
+export default async (app, appProps, options = {}) => {
   app.engine("html.js", (filePath, data, callback) => {
     if (viewCache.has(filePath)) {
       const cachedView = viewCache.get(filePath);
-      renderView(cachedView, data, appProps, callback);
+      renderView(cachedView, data, appProps, callback, options);
     } else {
       import(filePath)
         .then(async (view) => {
           viewCache.set(filePath, view);
 
-          renderView(view, data, appProps, callback);
+          renderView(view, data, appProps, callback, options);
         })
         .catch((err) => {
           console.error(err);
@@ -80,8 +80,8 @@ export default async (app, appProps) => {
   });
 };
 
-const renderView = async (view, _data, appProps = {}, callback) => {
-  const Materia = new MateriaJS();
+const renderView = async (view, _data, appProps = {}, callback, options = {}) => {
+  const Materia = new MateriaJS({ inView: options.inView });
 
   let viewProps = view.data || view.props || {};
 

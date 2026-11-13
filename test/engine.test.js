@@ -98,3 +98,17 @@ test("a view can export its initial data as `data`, or export none", async () =>
   assert.match(await renderView("data-export.html.js", {}), />Data export<\/p>/);
   assert.match(await renderView("bare.html.js", {}), />No props<\/p>/);
 });
+
+test("InView defaults passed to the engine reach the page's startup script", async () => {
+  const configured = stubApp();
+  await engine(configured, {}, { inView: { margin: "77px", threshold: 0.3 } });
+
+  const html = await new Promise((resolve, reject) =>
+    configured.engines["html.js"](path.join(views, "inview.html.js"), {}, (error, out) =>
+      error ? reject(error) : resolve(out)
+    )
+  );
+
+  assert.match(html, /data-inview-id/);
+  assert.match(html, /\\"margin\\":\\"77px\\",\\"threshold\\":0.3/);
+});

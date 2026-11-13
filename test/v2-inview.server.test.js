@@ -25,8 +25,35 @@ test("InView returns a marked helper holding the value and its options", () => {
 });
 
 test("server output shows the initial value, or nothing, for an InView value", () => {
-  assert.equal(
+  assert.match(
     materia.render(new v2.P({ title: InView("Later"), $textContent: InView("Shown", { initial: "Loading" }) })),
-    "<!DOCTYPE html><p>Loading</p>"
+    /^<!DOCTYPE html><p data-inview-id="[^"]+">Loading<\/p>$/
   );
+});
+
+test("server output marks InView elements and child anchors, and the registry describes them", () => {
+  const html = materia.render(
+    new v2.Div({
+      $classList: ["a", InView("b")],
+      $children: [InView(new v2.Em("late"), { initial: "soon" })],
+    })
+  );
+  const id = html.match(/data-inview-id="([^"]+)"/)[1];
+  const anchor = html.match(/<!--materia-inview:([^-]+)-->soon/)[1];
+  const entries = materia.review().inViewEntries[id];
+
+  assert.match(html, /class="a"/);
+  assert.deepEqual(entries.map((entry) => entry.kind).sort(), ["child", "collection"]);
+  assert.equal(entries.find((entry) => entry.kind === "child").anchorId, anchor);
+  assert.equal(entries.find((entry) => entry.kind === "collection").inView.__materiaInView, true);
+});
+
+test("a full page's startup script hands the InView registry and defaults to the browser", () => {
+  const server = new MateriaJS({ inView: { margin: "40px" } });
+  const page = server.render(
+    new v2.Html({ $children: [new v2.Head({}), new v2.Body({ $children: [new v2.P({ $textContent: InView("x") })] })] })
+  );
+
+  assert.match(page, /inViewEntries/);
+  assert.match(page, /\\"margin\\":\\"40px\\"/);
 });

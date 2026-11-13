@@ -137,6 +137,11 @@ class MateriaJS {
 
       // Add all pipes to the unimported list and schedule idle pipe importing
       this.#initializeUnimportedPipes();
+
+      // Pick up InView values from a server-rendered page
+      if (params.inViewEntries) {
+        this.#v2HydrateInView(params.inViewEntries);
+      }
     }
   }
 
@@ -731,6 +736,8 @@ class MateriaJS {
       handlers: this.#handlers,
       triggers: this.#triggers,
       delegate: this.#delegate,
+      inView: this.#inViewDefaults,
+      inViewEntries: this.#inViewRegistry,
     };
   }
 
@@ -2108,8 +2115,18 @@ class MateriaJS {
    */
   #inViewRevealed = new WeakMap();
 
+  /**
+   * The key revealed state is tracked by: a server-assigned id for InViews
+   * revived from a server-rendered page, otherwise the object itself.
+   * @param {Object} inView - The InView object.
+   * @returns {string|Object} The identity key.
+   */
+  #v2InViewIdentity(inView) {
+    return inView.id ?? inView;
+  }
+
   #v2IsRevealed(element, inView) {
-    return !!this.#inViewRevealed.get(element)?.has(inView);
+    return !!this.#inViewRevealed.get(element)?.has(this.#v2InViewIdentity(inView));
   }
 
   #v2MarkRevealed(element, inView, revealed) {
@@ -2117,7 +2134,80 @@ class MateriaJS {
       this.#inViewRevealed.set(element, new Set());
     }
     const set = this.#inViewRevealed.get(element);
-    revealed ? set.add(inView) : set.delete(inView);
+    const identity = this.#v2InViewIdentity(inView);
+    revealed ? set.add(identity) : set.delete(identity);
+  }
+
+  /**
+   * InView entries recorded on the server, by element id, for the page's
+   * startup script.
+   */
+  #inViewRegistry = {};
+
+  /**
+   * Server-assigned ids for InView objects.
+   */
+  #inViewIds = new WeakMap();
+
+  #v2InViewServerId(inView) {
+    if (!this.#inViewIds.has(inView)) {
+      this.#inViewIds.set(inView, this.#generateUniqueId());
+    }
+    return this.#inViewIds.get(inView);
+  }
+
+  /**
+   * Picks up the InView entries a server-rendered page handed over: finds
+   * each element (and child anchor), revives its values, and starts
+   * watching it.
+   * @param {Object} registry - Serialized entries by element id.
+   * @returns {Promise<void>}
+   */
+  async #v2HydrateInView(registry) {
+    for (const id in registry) {
+      const element = document.querySelector(`[data-inview-id="${id}"]`);
+      if (!element) continue;
+
+      for (const record of registry[id]) {
+        const entry = this.#v2InViewEntry(
+          record.kind,
+          record.property,
+          await this.#v2ReviveTemplate(record.inView),
+          record.depth,
+          await this.#v2ReviveTemplate(record.template)
+        );
+
+        if (record.kind === "child") {
+          entry.anchor = this.#v2FindInViewAnchor(element, record.anchorId);
+          if (!entry.anchor) continue;
+
+          entry.nodes = [];
+          let node = entry.anchor.nextSibling;
+          while (node && entry.nodes.length < record.nodeCount) {
+            entry.nodes.push(node);
+            node = node.nextSibling;
+          }
+        }
+
+        if (this.#v2TrackInView(element, entry)) {
+          this.#v2SetInView(element, entry, true);
+        }
+      }
+    }
+  }
+
+  /**
+   * Finds a server-rendered InView child anchor comment.
+   * @param {Element} element - The parent element.
+   * @param {string} anchorId - The anchor's id.
+   * @returns {Comment|null} The anchor.
+   */
+  #v2FindInViewAnchor(element, anchorId) {
+    const walker = document.createTreeWalker(element, 128 /* SHOW_COMMENT */);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node.data === `materia-inview:${anchorId}`) return node;
+    }
+    return null;
   }
 
   /**
@@ -2181,7 +2271,10 @@ class MateriaJS {
    * @returns {boolean} Whether the entry was revealed immediately.
    */
   #v2TrackInView(element, entry) {
-    if (isServer) return false;
+    if (isServer) {
+      this.#v2RecordInView(element, entry);
+      return false;
+    }
 
     if (typeof IntersectionObserver !== "function") {
       entry.revealed = true;
@@ -2204,6 +2297,33 @@ class MateriaJS {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Records an entry in the server registry, marking its element (and, for
+   * a child, its anchor) with an id the browser can find.
+   * @param {Element} element - The element.
+   * @param {Object} entry - The InView entry.
+   */
+  #v2RecordInView(element, entry) {
+    if (!element.dataset.inviewId) {
+      element.dataset.inviewId = this.#generateUniqueId();
+    }
+
+    const record = {
+      kind: entry.kind,
+      property: entry.property,
+      depth: entry.depth,
+      inView: this.#v2SerializeTemplate(entry.inView),
+      template: this.#v2SerializeTemplate(entry.template),
+    };
+
+    if (entry.kind === "child") {
+      entry.anchorId = record.anchorId = this.#generateUniqueId();
+      entry.record = record;
+    }
+
+    (this.#inViewRegistry[element.dataset.inviewId] ||= []).push(record);
   }
 
   /**
@@ -2361,7 +2481,9 @@ class MateriaJS {
     fragment.appendChild(anchor);
 
     let entry = (this.#inViewEntries.get(element) || []).find(
-      (existing) => existing.kind === "child" && existing.inView === inView
+      (existing) =>
+        existing.kind === "child" &&
+        this.#v2InViewIdentity(existing.inView) === this.#v2InViewIdentity(inView)
     );
 
     if (!entry) {
@@ -2382,6 +2504,12 @@ class MateriaJS {
       : inView.options.initial;
     entry.nodes = this.#v2RenderChildContent(content, depth);
     entry.nodes.forEach((node) => fragment.appendChild(node));
+
+    if (entry.record) {
+      // the server labels the anchor so the browser can find it
+      anchor.data = `materia-inview:${entry.anchorId}`;
+      entry.record.nodeCount = entry.nodes.length;
+    }
 
     return fragment;
   }
@@ -2941,6 +3069,19 @@ class MateriaJS {
       };
     }
 
+    if (this.#isInView(value)) {
+      const { initial, ...options } = value.options;
+      return {
+        __materiaInView: true,
+        id: this.#v2InViewServerId(value),
+        value: this.#v2SerializeTemplate(value.value),
+        options:
+          initial === undefined
+            ? options
+            : { ...options, initial: this.#v2SerializeTemplate(initial) },
+      };
+    }
+
     if (Array.isArray(value)) {
       return value.map((item) => this.#v2SerializeTemplate(item));
     }
@@ -2972,6 +3113,20 @@ class MateriaJS {
 
     if (value.__materiaHandle === true) {
       return Handle(value.imports, this.#parseStringifiedFunction(value.handler));
+    }
+
+    if (value.__materiaInView === true) {
+      const { initial, ...options } = value.options;
+      const inView = InView(
+        await this.#v2ReviveTemplate(value.value),
+        initial === undefined
+          ? options
+          : { ...options, initial: await this.#v2ReviveTemplate(initial) }
+      );
+      // the server id keeps copies of one InView (e.g. in a Bind's template
+      // and in the registry) sharing revealed state
+      inView.id = value.id;
+      return inView;
     }
 
     if (Array.isArray(value)) {
@@ -3227,8 +3382,12 @@ class MateriaJS {
         const triggers = JSON.parse("${this.#stringifyObject(this.#triggers)}");
           
         const delegate = JSON.parse("${this.#stringifyObject(this.#delegate)}");
+
+        const inView = JSON.parse("${this.#stringifyObject(this.#inViewDefaults)}");
+
+        const inViewEntries = JSON.parse("${this.#stringifyObject(this.#inViewRegistry)}");
           
-        window.Materia = new MateriaJS({data, handlers, triggers, delegate});
+        window.Materia = new MateriaJS({data, handlers, triggers, delegate, inView, inViewEntries});
 
         Materia.loadHandler();
       `;
