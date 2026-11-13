@@ -35,6 +35,10 @@ const IMPORT_MARKER = Symbol.for("materiaImport");
 const BIND_MARKER = Symbol.for("materiaBind");
 const HANDLE_MARKER = Symbol.for("materiaHandle");
 const INVIEW_MARKER = Symbol.for("materiaInView");
+// marks the stand-in object that renders an InView `$children` item
+const INVIEW_PLACEHOLDER = Symbol("materiaInViewPlaceholder");
+// marks an InView value with nothing to show yet (dropped from collections)
+const INVIEW_OMIT = Symbol("materiaInViewOmit");
 
 export { BIND_MARKER, HANDLE_MARKER, INVIEW_MARKER };
 
@@ -791,6 +795,18 @@ class MateriaJS {
 
     value = this.#v2ProcessBindableValue(element, key, value, depth);
 
+    this.#v2ApplyValue(element, key, value, depth);
+  }
+
+  /**
+   * Writes an already-processed v2 value to the element (no Bind or InView
+   * registration).
+   * @param {Element} element - The element.
+   * @param {string} key - The property or attribute key.
+   * @param {*} value - The evaluated value.
+   * @param {number} depth - The render depth.
+   */
+  #v2ApplyValue(element, key, value, depth = 0) {
     if (key === "$textContent") {
       this.#setTextContent(element, value);
     } else if (key === "$innerHTML") {
@@ -1247,15 +1263,6 @@ class MateriaJS {
       handler.templateSerialized = false;
     }
 
-    const value = collectionTemplate
-      ? this.#v2EvaluateCollectionTemplate(property, collectionTemplate)
-      : func({
-          data,
-          imports,
-          elements: elements_v2,
-          core: { Bind, Import, Handle },
-        });
-
     if (typeof element === "string") {
       const query = "[data-handler-id='" + element + "']";
       element = document.querySelector(query);
@@ -1272,6 +1279,25 @@ class MateriaJS {
       );
       return;
     }
+
+    // a binding inside a hidden top-level InView waits until it is shown
+    if (!collectionTemplate && this.#v2IsInViewHidden(element, property)) {
+      return;
+    }
+
+    const value = collectionTemplate
+      ? this.#v2EvaluateCollectionTemplate(
+          property,
+          collectionTemplate,
+          element,
+          handler.depth
+        )
+      : func({
+          data,
+          imports,
+          elements: elements_v2,
+          core: { Bind, Import, Handle, InView },
+        });
 
     this.#setElementAttribute_v2(element, property, value);
   }
@@ -1934,6 +1960,10 @@ class MateriaJS {
 
   // `render()` handles empty, `if`, and string templates before dispatching here
   #render_v2(template, callbackOrQuery, depth = 0) {
+    if (template[INVIEW_PLACEHOLDER]) {
+      return this.#v2RenderInViewChild(template[INVIEW_PLACEHOLDER]);
+    }
+
     const tagName = template.$tagName || template.tagName || "div";
     const element = document.createElementNS(
       this.#getNamespace(tagName),
@@ -2016,7 +2046,7 @@ class MateriaJS {
       event,
       imports: (await this.#v2ResolveStoredImports(imports)) ?? null,
       elements: elements_v2,
-      core: { Bind, Import, Handle },
+      core: { Bind, Import, Handle, InView },
     });
   }
 
@@ -2068,37 +2098,381 @@ class MateriaJS {
   }
 
   /**
-   * Registers a top-level InView value: shows its initial value (or nothing)
-   * and watches the element, or applies the value right away when the
-   * browser has no IntersectionObserver.
+   * Elements currently watched for InView values.
+   */
+  #inViewElements = new Set();
+
+  /**
+   * Revealed InView objects per element (consulted when collections are
+   * evaluated, so revealed values survive re-renders).
+   */
+  #inViewRevealed = new WeakMap();
+
+  #v2IsRevealed(element, inView) {
+    return !!this.#inViewRevealed.get(element)?.has(inView);
+  }
+
+  #v2MarkRevealed(element, inView, revealed) {
+    if (!this.#inViewRevealed.has(element)) {
+      this.#inViewRevealed.set(element, new Set());
+    }
+    const set = this.#inViewRevealed.get(element);
+    revealed ? set.add(inView) : set.delete(inView);
+  }
+
+  /**
+   * Whether a top-level InView on this property is currently hidden.
+   * @param {Element} element - The element.
+   * @param {string} property - The property key.
+   * @returns {boolean}
+   */
+  #v2IsInViewHidden(element, property) {
+    return (this.#inViewEntries.get(element) || []).some(
+      (entry) =>
+        entry.kind === "value" && entry.property === property && !entry.revealed
+    );
+  }
+
+  /**
+   * Finds the InView objects in a collection value (not inside other
+   * InViews or Binds).
+   * @param {*} value - The value.
+   * @param {Array} [found] - Accumulator.
+   * @returns {Array} The InView objects.
+   */
+  #v2FindInViews(value, found = []) {
+    if (!value || typeof value !== "object" || this.#isBind(value)) return found;
+    if (this.#isInView(value)) {
+      found.push(value);
+      return found;
+    }
+    Object.values(value).forEach((item) => this.#v2FindInViews(item, found));
+    return found;
+  }
+
+  /**
+   * Creates an InView entry for an element.
+   * @param {string} kind - "value", "collection", or "child".
+   * @param {string} property - The property key.
+   * @param {Object} inView - The InView object.
+   * @param {number} depth - The render depth.
+   * @param {*} [template] - The collection template, for collection/child entries.
+   * @returns {Object} The entry.
+   */
+  #v2InViewEntry(kind, property, inView, depth, template) {
+    return {
+      kind,
+      property,
+      inView,
+      template,
+      options: this.#v2InViewOptions(inView),
+      revealed: false,
+      registered: false,
+      depth,
+    };
+  }
+
+  /**
+   * Starts watching an entry: reveals it right away without
+   * IntersectionObserver; otherwise records it and observes the element.
+   * Does nothing on the server, which renders the initial state only.
+   * @param {Element} element - The element.
+   * @param {Object} entry - The InView entry.
+   * @returns {boolean} Whether the entry was revealed immediately.
+   */
+  #v2TrackInView(element, entry) {
+    if (isServer) return false;
+
+    if (typeof IntersectionObserver !== "function") {
+      entry.revealed = true;
+      this.#v2MarkRevealed(element, entry.inView, true);
+      return true;
+    }
+
+    if (!this.#inViewEntries.has(element)) {
+      this.#inViewEntries.set(element, []);
+    }
+    this.#inViewEntries.get(element).push(entry);
+    this.#inViewElements.add(element);
+    this.#v2InViewObserver(entry.options).observe(element);
+
+    // observing an already-watched element fires no new callback, so an
+    // entry added while the element is visible is revealed right away
+    if (this.#inViewVisible.get(element)?.has(this.#v2InViewKey(entry.options))) {
+      entry.revealed = true;
+      this.#v2MarkRevealed(element, entry.inView, true);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Option-set keys each element was last seen visible for.
+   */
+  #inViewVisible = new WeakMap();
+
+  #v2InViewKey({ margin, threshold }) {
+    return `${margin}|${threshold}`;
+  }
+
+  /**
+   * Removes an element's InView entries matching a predicate, and stops
+   * observing for option sets no remaining entry uses.
+   * @param {Element} element - The element.
+   * @param {Function} predicate - Selects the entries to remove.
+   */
+  #v2PruneInView(element, predicate) {
+    const entries = this.#inViewEntries.get(element);
+    if (!entries) return;
+
+    const kept = entries.filter((entry) => !predicate(entry));
+    this.#inViewEntries.set(element, kept);
+
+    entries
+      .filter((entry) => predicate(entry))
+      .forEach((entry) => {
+        const key = this.#v2InViewKey(entry.options);
+        if (!kept.some((other) => this.#v2InViewKey(other.options) === key)) {
+          this.#v2InViewObserver(entry.options).unobserve(element);
+          this.#inViewVisible.get(element)?.delete(key);
+        }
+      });
+  }
+
+  /**
+   * Registers a top-level InView value and shows its initial state (or its
+   * value, when revealed immediately).
    * @param {Element} element - The element.
    * @param {string} property - The property or attribute key.
    * @param {Object} inView - The InView object.
    * @param {number} depth - The render depth.
    */
   #v2RegisterInView(element, property, inView, depth) {
-    const entry = {
-      property,
-      inView,
-      options: this.#v2InViewOptions(inView),
-      revealed: false,
-      depth,
-    };
+    const entry = this.#v2InViewEntry("value", property, inView, depth);
+    const revealedNow = this.#v2TrackInView(element, entry);
+    this.#v2SetInView(element, entry, revealedNow);
+  }
 
-    if (!isServer && typeof IntersectionObserver !== "function") {
-      this.#v2SetInView(element, entry, true);
+  /**
+   * Registers an InView found inside a collection value ($classList items,
+   * $style/$dataset values, and similar).
+   * @param {Element} element - The element.
+   * @param {string} property - The property key.
+   * @param {Object} inView - The InView object.
+   * @param {*} template - The whole collection value.
+   * @param {number} depth - The render depth.
+   */
+  #v2RegisterCollectionInView(element, property, inView, template, depth) {
+    // a re-render replaces the template; forget entries from the old one
+    this.#v2PruneInView(
+      element,
+      (entry) =>
+        entry.kind === "collection" &&
+        entry.property === property &&
+        entry.template !== template
+    );
+
+    const entry = this.#v2InViewEntry("collection", property, inView, depth, template);
+    if (this.#v2TrackInView(element, entry)) {
+      this.#v2RegisterInViewBinds(element, entry);
+    }
+  }
+
+  /**
+   * Registers the Binds inside a revealed InView so they update the whole
+   * collection, once per entry.
+   * @param {Element} element - The element.
+   * @param {Object} entry - The InView entry.
+   */
+  #v2RegisterInViewBinds(element, entry) {
+    if (entry.registered) return;
+    entry.registered = true;
+    this.#v2RegisterCollectionBinds(
+      element,
+      entry.property,
+      entry.inView.value,
+      entry.template,
+      entry.depth
+    );
+  }
+
+  /**
+   * Shows or hides an InView entry.
+   * @param {Element} element - The element.
+   * @param {Object} entry - The InView entry.
+   * @param {boolean} revealed - Whether to show the revealed value.
+   */
+  #v2SetInView(element, entry, revealed) {
+    entry.revealed = revealed;
+    this.#v2MarkRevealed(element, entry.inView, revealed);
+
+    if (entry.kind === "child") {
+      this.#v2SetInViewChild(element, entry, revealed);
       return;
     }
 
-    this.#v2SetInView(element, entry, false);
-
-    if (isServer) return;
-
-    if (!this.#inViewEntries.has(element)) {
-      this.#inViewEntries.set(element, []);
+    if (entry.kind === "collection") {
+      if (revealed) this.#v2RegisterInViewBinds(element, entry);
+      this.#v2ClearProperty(element, entry.property, entry.template);
+      this.#v2ApplyValue(
+        element,
+        entry.property,
+        this.#v2EvaluateBindableCollection(entry.template, element),
+        entry.depth
+      );
+      return;
     }
-    this.#inViewEntries.get(element).push(entry);
-    this.#v2InViewObserver(entry.options).observe(element);
+
+    const { property, inView, depth } = entry;
+
+    if (!revealed) {
+      this.#v2ClearProperty(element, property, inView.value);
+    }
+
+    const value = revealed ? inView.value : inView.options.initial;
+    if (value === undefined) return;
+
+    if (revealed && entry.registered) {
+      // Binds inside were registered on the first reveal; only re-apply
+      this.#v2ApplyValue(
+        element,
+        property,
+        this.#isBind(value)
+          ? this.#v2EvaluateBind(value)
+          : this.#v2EvaluateCollectionTemplate(property, value, element, depth),
+        depth
+      );
+      return;
+    }
+
+    if (revealed) entry.registered = true;
+    this.#setElementAttribute_v2(element, property, value, depth);
+  }
+
+  /**
+   * Renders an InView `$children` item: an anchor comment followed by the
+   * item's current content. The parent element is the one watched.
+   * @param {Object} info - `{ element, inView, template, depth }`.
+   * @returns {DocumentFragment} The anchor and content.
+   */
+  #v2RenderInViewChild({ element, inView, template, depth }) {
+    const anchor = document.createComment("materia-inview");
+    const fragment = document.createDocumentFragment();
+    fragment.appendChild(anchor);
+
+    let entry = (this.#inViewEntries.get(element) || []).find(
+      (existing) => existing.kind === "child" && existing.inView === inView
+    );
+
+    if (!entry) {
+      // children were re-rendered; forget items whose anchors are gone
+      this.#v2PruneInView(
+        element,
+        (existing) => existing.kind === "child" && !existing.anchor?.isConnected
+      );
+      entry = this.#v2InViewEntry("child", "$children", inView, depth, template);
+      if (this.#v2TrackInView(element, entry)) {
+        this.#v2RegisterChildBind(element, entry);
+      }
+    }
+
+    entry.anchor = anchor;
+    const content = this.#v2IsRevealed(element, inView)
+      ? inView.value
+      : inView.options.initial;
+    entry.nodes = this.#v2RenderChildContent(content, depth);
+    entry.nodes.forEach((node) => fragment.appendChild(node));
+
+    return fragment;
+  }
+
+  /**
+   * Registers a Bind that is an InView `$children` item's value, once.
+   * @param {Element} element - The parent element.
+   * @param {Object} entry - The child entry.
+   */
+  #v2RegisterChildBind(element, entry) {
+    if (entry.registered) return;
+    entry.registered = true;
+    if (this.#isBind(entry.inView.value)) {
+      this.#v2RegisterBind(element, "$children", entry.inView.value, entry.depth, {
+        collectionTemplate: entry.template,
+      });
+    }
+  }
+
+  /**
+   * Renders an InView child's content into DOM nodes.
+   * @param {*} content - Element(s), string(s), or a Bind.
+   * @param {number} depth - The render depth.
+   * @returns {Node[]} The rendered nodes.
+   */
+  #v2RenderChildContent(content, depth) {
+    if (content === undefined) return [];
+    const value = this.#isBind(content) ? this.#v2EvaluateBind(content) : content;
+
+    return (Array.isArray(value) ? value : [value])
+      .filter(Boolean)
+      .map((item) => this.render(item, null, depth + 1))
+      .filter((node) => node !== null);
+  }
+
+  /**
+   * Swaps an InView child's content after its anchor.
+   * @param {Element} element - The parent element.
+   * @param {Object} entry - The child entry.
+   * @param {boolean} revealed - Whether to show the revealed value.
+   */
+  #v2SetInViewChild(element, entry, revealed) {
+    if (!entry.anchor?.isConnected) return;
+    if (revealed) this.#v2RegisterChildBind(element, entry);
+
+    this.#v2RemoveNodes(entry.nodes);
+    entry.nodes = this.#v2RenderChildContent(
+      revealed ? entry.inView.value : entry.inView.options.initial,
+      entry.depth
+    );
+    entry.anchor.after(...entry.nodes);
+  }
+
+  /**
+   * Removes nodes and the handlers and InView watches attached to them.
+   * @param {Node[]} nodes - The nodes.
+   */
+  #v2RemoveNodes(nodes = []) {
+    nodes.forEach((node) => {
+      const handlerIds = this.#elementHandlerMap.get(node);
+      if (handlerIds) {
+        for (const handlerId of handlerIds) {
+          for (const key in this.#handlers) {
+            this.#handlers[key] = this.#handlers[key].filter(
+              (bind) => bind.element !== handlerId
+            );
+          }
+        }
+        this.#elementHandlerMap.delete(node);
+      }
+      this.#v2ForgetInView(node);
+      node.remove();
+    });
+  }
+
+  /**
+   * Stops watching InView elements inside (or equal to) a removed node.
+   * @param {Node} root - The node being removed.
+   */
+  #v2ForgetInView(root) {
+    if (this.#inViewElements.size === 0) return;
+
+    for (const element of this.#inViewElements) {
+      if (root === element || root.contains?.(element)) {
+        for (const entry of this.#inViewEntries.get(element)) {
+          this.#v2InViewObserver(entry.options).unobserve(element);
+        }
+        this.#inViewEntries.delete(element);
+        this.#inViewElements.delete(element);
+      }
+    }
   }
 
   /**
@@ -2140,6 +2514,13 @@ class MateriaJS {
       intersection.isIntersecting &&
       intersection.intersectionRatio >= entries[0]?.options.threshold;
 
+    if (!this.#inViewVisible.has(element)) {
+      this.#inViewVisible.set(element, new Set());
+    }
+    visible
+      ? this.#inViewVisible.get(element).add(key)
+      : this.#inViewVisible.get(element).delete(key);
+
     entries.forEach((entry) => {
       if (visible && !entry.revealed) {
         this.#v2SetInView(element, entry, true);
@@ -2150,27 +2531,7 @@ class MateriaJS {
 
     if (entries.every((entry) => entry.revealed && entry.options.once)) {
       observer.unobserve(element);
-    }
-  }
-
-  /**
-   * Applies an InView entry's revealed value, or its initial value (clearing
-   * the property when there is none).
-   * @param {Element} element - The element.
-   * @param {Object} entry - The InView entry.
-   * @param {boolean} revealed - Whether to show the revealed value.
-   */
-  #v2SetInView(element, entry, revealed) {
-    const { property, inView, depth } = entry;
-    entry.revealed = revealed;
-
-    if (!revealed) {
-      this.#v2ClearProperty(element, property, inView.value);
-    }
-
-    const value = revealed ? inView.value : inView.options.initial;
-    if (value !== undefined) {
-      this.#setElementAttribute_v2(element, property, value, depth);
+      this.#inViewVisible.get(element).delete(key);
     }
   }
 
@@ -2188,6 +2549,8 @@ class MateriaJS {
       this.#clearChildren(element);
     } else if (property === "$classList") {
       element.removeAttribute("class");
+    } else if (property === "$style") {
+      element.removeAttribute("style");
     } else if (property === "$dataset") {
       Object.keys(value || {}).forEach((key) => delete element.dataset[key]);
     } else if (property.startsWith("$")) {
@@ -2444,7 +2807,12 @@ class MateriaJS {
   #v2ProcessBindableValue(element, property, value, depth) {
     if (this.#isBind(value)) {
       this.#v2RegisterBind(element, property, value, depth);
-      return this.#v2EvaluateBind(value);
+      return this.#v2ProcessInViews(
+        element,
+        property,
+        this.#v2EvaluateBind(value),
+        depth
+      );
     }
 
     // Static `$children` render one by one, so each child registers its own
@@ -2459,21 +2827,52 @@ class MateriaJS {
         })
       );
 
-      return directBinds.length > 0
-        ? this.#v2EvaluateChildrenTemplate(value)
+      return directBinds.length > 0 || value.some((item) => this.#isInView(item))
+        ? this.#v2EvaluateChildrenTemplate(value, element, depth)
         : value;
     }
 
+    const inViews = this.#v2FindInViews(value);
+    inViews.forEach((inView) =>
+      this.#v2RegisterCollectionInView(element, property, inView, value, depth)
+    );
+
     if (this.#v2ContainsBind(value)) {
       this.#v2RegisterCollectionBinds(element, property, value, value, depth);
-      return this.#v2EvaluateBindableCollection(value);
     }
 
-    return value;
+    return inViews.length > 0 || this.#v2ContainsBind(value)
+      ? this.#v2EvaluateBindableCollection(value, element)
+      : value;
   }
 
   #isBind(value) {
     return value && value[BIND_MARKER] === true;
+  }
+
+  /**
+   * Handles InView values inside an evaluated value (e.g. a Bind handler's
+   * result) without registering any Binds.
+   * @param {Element} element - The element.
+   * @param {string} property - The property key.
+   * @param {*} value - The evaluated value.
+   * @param {number} depth - The render depth.
+   * @returns {*} The value with InViews resolved.
+   */
+  #v2ProcessInViews(element, property, value, depth) {
+    if (property === "$children" && Array.isArray(value)) {
+      return value.some((item) => this.#isInView(item))
+        ? this.#v2EvaluateChildrenTemplate(value, element, depth)
+        : value;
+    }
+
+    const inViews = this.#v2FindInViews(value);
+    inViews.forEach((inView) =>
+      this.#v2RegisterCollectionInView(element, property, inView, value, depth)
+    );
+    return inViews.length > 0
+      ? this.#v2EvaluateBindableCollection(value, element)
+      : value;
   }
 
   /**
@@ -2482,8 +2881,17 @@ class MateriaJS {
    * @param {Array} template - The `$children` array.
    * @returns {Array} The children, with direct Bind results flattened in.
    */
-  #v2EvaluateChildrenTemplate(template) {
+  #v2EvaluateChildrenTemplate(template, element, depth = 0) {
     return template.flatMap((item) => {
+      if (this.#isInView(item)) {
+        return [
+          {
+            isV2Element: true,
+            [INVIEW_PLACEHOLDER]: { element, inView: item, template, depth },
+          },
+        ];
+      }
+
       if (!this.#isBind(item)) return [item];
 
       const result = this.#v2EvaluateBind(item);
@@ -2497,10 +2905,10 @@ class MateriaJS {
    * @param {*} template - The stored template.
    * @returns {*} The evaluated value.
    */
-  #v2EvaluateCollectionTemplate(property, template) {
+  #v2EvaluateCollectionTemplate(property, template, element, depth) {
     return property === "$children"
-      ? this.#v2EvaluateChildrenTemplate(template)
-      : this.#v2EvaluateBindableCollection(template);
+      ? this.#v2EvaluateChildrenTemplate(template, element, depth)
+      : this.#v2EvaluateBindableCollection(template, element);
   }
 
   /**
@@ -2580,23 +2988,37 @@ class MateriaJS {
   #v2ContainsBind(value) {
     if (!value || typeof value !== "object") return false;
     if (this.#isBind(value)) return true;
+    // Binds inside an InView register when it is revealed
+    if (this.#isInView(value)) return false;
 
     return Object.values(value).some((item) => this.#v2ContainsBind(item));
   }
 
-  #v2EvaluateBindableCollection(value) {
+  #v2EvaluateBindableCollection(value, element) {
     if (this.#isBind(value)) {
       return this.#v2EvaluateBind(value);
     }
 
+    if (this.#isInView(value)) {
+      if (this.#v2IsRevealed(element, value)) {
+        return this.#v2EvaluateBindableCollection(value.value, element);
+      }
+      return value.options.initial === undefined
+        ? INVIEW_OMIT
+        : this.#v2EvaluateBindableCollection(value.options.initial, element);
+    }
+
     if (Array.isArray(value)) {
-      return value.map((item) => this.#v2EvaluateBindableCollection(item));
+      return value
+        .map((item) => this.#v2EvaluateBindableCollection(item, element))
+        .filter((item) => item !== INVIEW_OMIT);
     }
 
     if (value && typeof value === "object") {
       const processed = {};
       for (const key in value) {
-        processed[key] = this.#v2EvaluateBindableCollection(value[key]);
+        const item = this.#v2EvaluateBindableCollection(value[key], element);
+        if (item !== INVIEW_OMIT) processed[key] = item;
       }
       return processed;
     }
@@ -2605,6 +3027,9 @@ class MateriaJS {
   }
 
   #v2RegisterCollectionBinds(element, property, value, collectionTemplate, depth) {
+    // Binds inside an InView register when it is revealed
+    if (this.#isInView(value)) return;
+
     if (this.#isBind(value)) {
       this.#v2RegisterBind(element, property, value, depth, {
         collectionTemplate,
@@ -2633,7 +3058,7 @@ class MateriaJS {
       data,
       imports,
       elements: elements_v2,
-      core: { Bind, Import, Handle },
+      core: { Bind, Import, Handle, InView },
     });
   }
 
@@ -2841,6 +3266,9 @@ class MateriaJS {
     const children = element.childNodes;
 
     Array.from(children).forEach((child) => {
+      // Stop watching InView elements being removed (no-op when none exist)
+      this.#v2ForgetInView(child);
+
       // Remove handlers associated with this child
       const handlerIds = this.#elementHandlerMap.get(child);
       if (handlerIds) {
@@ -2956,6 +3384,9 @@ class MateriaJS {
       delete this.#handlers[bindingOrElement];
     } else if (bindingOrElement instanceof Element) {
       const element = bindingOrElement;
+
+      // Stop watching InView elements being removed (no-op when none exist)
+      this.#v2ForgetInView(element);
 
       const asyncDestroy = async () => {
         // Remove any handlers connected to this element

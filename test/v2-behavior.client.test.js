@@ -94,7 +94,7 @@ test("a bare-function __ event handler receives the v2 context object", async ()
   assert.equal(context.event.type, "click");
   assert.equal(context.imports, null);
   assert.equal(context.elements, v2);
-  assert.deepEqual(Object.keys(context.core).sort(), ["Bind", "Handle", "Import"]);
+  assert.deepEqual(Object.keys(context.core).sort(), ["Bind", "Handle", "Import", "InView"]);
 });
 
 test("Handle passes plain imports and resolves Import helpers", async () => {
