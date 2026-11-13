@@ -65,6 +65,8 @@ import { Div, H1, P } from "materiajs/v2/elements";
 | `materiajs/v2/elements` | The v2 element library |
 | `materiajs/engine` | The Express view engine for server-side rendering |
 | `materiajs/elements` | The v1 element library (see [Migrating from v1](#migrating-from-v1)) |
+| `materiajs/attributes` | The lists of valid attributes, events, and `$` properties Materia recognizes |
+| `materiajs/validProps` | An alias for `materiajs/attributes` |
 
 ## Elements
 
@@ -227,6 +229,8 @@ export default (data) =>
 ```
 
 To set app-wide data, pass it to the engine: `engine(app, { siteName: "My Site" })`. Values in `props` can also be functions; each one receives the `res.render` data, may be `async`, and its result is stored under its key.
+
+A view can name its initial-data export `data` instead of `props`. The export must be an object; anything else is ignored and an error is logged. If the `res.render` data includes `user`, it is also stored as Materia data under `user`, so views can `Bind("user.name")`.
 
 ## Binding with `Bind`
 
