@@ -34,8 +34,9 @@ if (isServer) {
 const IMPORT_MARKER = Symbol.for("materiaImport");
 const BIND_MARKER = Symbol.for("materiaBind");
 const HANDLE_MARKER = Symbol.for("materiaHandle");
+const INVIEW_MARKER = Symbol.for("materiaInView");
 
-export { BIND_MARKER, HANDLE_MARKER };
+export { BIND_MARKER, HANDLE_MARKER, INVIEW_MARKER };
 
 export function Import(component, path) {
   return {
@@ -91,6 +92,18 @@ export function Handle(importsOrHandler, handler) {
 }
 
 /**
+ * Holds a v2 value back until its element scrolls into view.
+ * @param {*} value - The value to apply once the element is in view.
+ * @param {Object} [options] - `initial` (shown until then), `margin`
+ *   (IntersectionObserver rootMargin), `threshold`, and `once` (default true;
+ *   false reverts the value when the element leaves the viewport).
+ * @returns {Object} A marked InView object.
+ */
+export function InView(value, options = {}) {
+  return { [INVIEW_MARKER]: true, value, options: { ...options } };
+}
+
+/**
  * The main MateriaJS class.
  * @class Materia
  * @param {Object} params - The parameters for the Materia class when initializing.
@@ -101,6 +114,10 @@ export function Handle(importsOrHandler, handler) {
  */
 class MateriaJS {
   constructor(params) {
+    if (params?.inView) {
+      this.#inViewDefaults = { ...this.#inViewDefaults, ...params.inView };
+    }
+
     if (!isServer) {
       // Get the data and handlers from the params
       const { data, handlers, triggers, delegate } = params;
@@ -766,6 +783,11 @@ class MateriaJS {
 
   #setElementAttribute_v2(element, key, value, depth = 0) {
     if (value === null) return;
+
+    if (this.#isInView(value)) {
+      this.#v2RegisterInView(element, key, value, depth);
+      return;
+    }
 
     value = this.#v2ProcessBindableValue(element, key, value, depth);
 
@@ -1931,6 +1953,13 @@ class MateriaJS {
         return;
       }
 
+      if (this.#isEventKey_v2(key) && this.#isInView(value)) {
+        console.error(
+          `InView is not supported on event keys; "${key}" was not registered.`
+        );
+        return;
+      }
+
       if (this.#isEventKey_v2(key)) {
         if (!element.dataset.delegateId) {
           element.dataset.delegateId = this.#generateUniqueId();
@@ -2002,6 +2031,170 @@ class MateriaJS {
     if (!element || !element.isConnected) return false;
 
     return element.contains(event.target) ? false : element;
+  }
+
+  /**
+   * Defaults for InView observers; overridable with the constructor's
+   * `inView` option.
+   */
+  #inViewDefaults = { margin: "0px", threshold: 0.1 };
+
+  /**
+   * InView entries per element: `{ property, inView, options, revealed, depth }`.
+   */
+  #inViewEntries = new WeakMap();
+
+  /**
+   * Shared IntersectionObservers, one per `margin|threshold` option set.
+   */
+  #inViewObservers = new Map();
+
+  #isInView(value) {
+    return !!value && value[INVIEW_MARKER] === true;
+  }
+
+  /**
+   * Resolves an InView's options against the instance and built-in defaults.
+   * @param {Object} inView - The InView object.
+   * @returns {{ margin: string, threshold: number, once: boolean }}
+   */
+  #v2InViewOptions(inView) {
+    const { margin, threshold, once } = inView.options;
+    return {
+      margin: margin ?? this.#inViewDefaults.margin,
+      threshold: threshold ?? this.#inViewDefaults.threshold,
+      once: once ?? true,
+    };
+  }
+
+  /**
+   * Registers a top-level InView value: shows its initial value (or nothing)
+   * and watches the element, or applies the value right away when the
+   * browser has no IntersectionObserver.
+   * @param {Element} element - The element.
+   * @param {string} property - The property or attribute key.
+   * @param {Object} inView - The InView object.
+   * @param {number} depth - The render depth.
+   */
+  #v2RegisterInView(element, property, inView, depth) {
+    const entry = {
+      property,
+      inView,
+      options: this.#v2InViewOptions(inView),
+      revealed: false,
+      depth,
+    };
+
+    if (!isServer && typeof IntersectionObserver !== "function") {
+      this.#v2SetInView(element, entry, true);
+      return;
+    }
+
+    this.#v2SetInView(element, entry, false);
+
+    if (isServer) return;
+
+    if (!this.#inViewEntries.has(element)) {
+      this.#inViewEntries.set(element, []);
+    }
+    this.#inViewEntries.get(element).push(entry);
+    this.#v2InViewObserver(entry.options).observe(element);
+  }
+
+  /**
+   * Returns the shared observer for an option set, creating it on first use.
+   * @param {{ margin: string, threshold: number }} options - Resolved options.
+   * @returns {IntersectionObserver} The observer.
+   */
+  #v2InViewObserver({ margin, threshold }) {
+    const key = `${margin}|${threshold}`;
+
+    if (!this.#inViewObservers.has(key)) {
+      const observer = new IntersectionObserver(
+        (entries) =>
+          entries.forEach((intersection) =>
+            this.#v2HandleIntersection(key, intersection, observer)
+          ),
+        { rootMargin: margin, threshold }
+      );
+      this.#inViewObservers.set(key, observer);
+    }
+
+    return this.#inViewObservers.get(key);
+  }
+
+  /**
+   * Reveals or hides an element's InView entries for one observer, and stops
+   * watching the element once nothing is left to toggle.
+   * @param {string} key - The observer's option-set key.
+   * @param {IntersectionObserverEntry} intersection - The observer entry.
+   * @param {IntersectionObserver} observer - The observer.
+   */
+  #v2HandleIntersection(key, intersection, observer) {
+    const element = intersection.target;
+    // an element is only observed after its entry list exists
+    const entries = this.#inViewEntries.get(element).filter(
+      (entry) => `${entry.options.margin}|${entry.options.threshold}` === key
+    );
+    const visible =
+      intersection.isIntersecting &&
+      intersection.intersectionRatio >= entries[0]?.options.threshold;
+
+    entries.forEach((entry) => {
+      if (visible && !entry.revealed) {
+        this.#v2SetInView(element, entry, true);
+      } else if (!visible && entry.revealed && !entry.options.once) {
+        this.#v2SetInView(element, entry, false);
+      }
+    });
+
+    if (entries.every((entry) => entry.revealed && entry.options.once)) {
+      observer.unobserve(element);
+    }
+  }
+
+  /**
+   * Applies an InView entry's revealed value, or its initial value (clearing
+   * the property when there is none).
+   * @param {Element} element - The element.
+   * @param {Object} entry - The InView entry.
+   * @param {boolean} revealed - Whether to show the revealed value.
+   */
+  #v2SetInView(element, entry, revealed) {
+    const { property, inView, depth } = entry;
+    entry.revealed = revealed;
+
+    if (!revealed) {
+      this.#v2ClearProperty(element, property, inView.value);
+    }
+
+    const value = revealed ? inView.value : inView.options.initial;
+    if (value !== undefined) {
+      this.#setElementAttribute_v2(element, property, value, depth);
+    }
+  }
+
+  /**
+   * Removes a property's value from an element (used before re-applying an
+   * InView's initial value).
+   * @param {Element} element - The element.
+   * @param {string} property - The property or attribute key.
+   * @param {*} value - The value being removed (needed for `$dataset` keys).
+   */
+  #v2ClearProperty(element, property, value) {
+    if (property === "$textContent" || property === "$innerHTML") {
+      element[property.slice(1)] = "";
+    } else if (property === "$children") {
+      this.#clearChildren(element);
+    } else if (property === "$classList") {
+      element.removeAttribute("class");
+    } else if (property === "$dataset") {
+      Object.keys(value || {}).forEach((key) => delete element.dataset[key]);
+    } else if (property.startsWith("$")) {
+      element.removeAttribute(property.slice(1).toLowerCase());
+    } else {
+      element.removeAttribute(this.#attributeName_v2(property));
+    }
   }
 
   #isHandle(value) {

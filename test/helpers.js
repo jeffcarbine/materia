@@ -71,3 +71,52 @@ export function installClientDom(
 export function flush() {
   return new Promise((resolve) => setTimeout(resolve, 20));
 }
+
+/**
+ * Replaces the IntersectionObserver global with a controllable stand-in so
+ * tests can decide when elements enter or leave the viewport.
+ * @returns {{ observers: Array, enter: Function, leave: Function, observersFor: Function }}
+ *   `observers` lists every observer created (with `options` and `targets`);
+ *   `enter(el)` / `leave(el)` fire the callbacks of observers watching `el`;
+ *   `observersFor(el)` lists the observers currently watching `el`.
+ */
+export function installIntersectionObserverStub() {
+  const observers = [];
+
+  class StubIntersectionObserver {
+    constructor(callback, options = {}) {
+      this.callback = callback;
+      this.options = options;
+      this.targets = new Set();
+      observers.push(this);
+    }
+    observe(target) {
+      this.targets.add(target);
+    }
+    unobserve(target) {
+      this.targets.delete(target);
+    }
+    disconnect() {
+      this.targets.clear();
+    }
+  }
+
+  globalThis.IntersectionObserver = StubIntersectionObserver;
+  globalThis.window.IntersectionObserver = StubIntersectionObserver;
+
+  const fire = (target, isIntersecting) => {
+    for (const observer of observers.filter((o) => o.targets.has(target))) {
+      observer.callback(
+        [{ target, isIntersecting, intersectionRatio: isIntersecting ? 1 : 0 }],
+        observer
+      );
+    }
+  };
+
+  return {
+    observers,
+    enter: (target) => fire(target, true),
+    leave: (target) => fire(target, false),
+    observersFor: (target) => observers.filter((o) => o.targets.has(target)),
+  };
+}
